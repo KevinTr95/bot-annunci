@@ -15,6 +15,15 @@ _LOMBARDIA = [
     "peschiera borromeo", "san giuliano milanese", "melegnano", "ispra", "lainate", "garbagnate",
     "novate milanese", "cormano", "bresso", "pioltello", "carugate", "trezzano", "buccinasco",
 ]
+# Milano e città metropolitana (non tutta la Lombardia)
+_MILANO = [
+    "milano", "milan", "sesto san giovanni", "segrate", "assago", "rho", "cinisello", "paderno dugnano",
+    "san donato milanese", "rozzano", "cologno monzese", "basiglio", "bollate", "arese", "cernusco",
+    "pero", "settimo milanese", "corsico", "opera", "peschiera borromeo", "san giuliano milanese",
+    "melegnano", "lainate", "garbagnate", "novate milanese", "cormano", "bresso", "pioltello",
+    "carugate", "trezzano", "buccinasco", "legnano", "abbiategrasso", "magenta", "vimodrone",
+    "cusano milanino", "senago", "limbiate", "baranzate", "cesano boscone", "lacchiarella",
+]
 _TICINO = [
     "ticino", "tessin", "lugano", "chiasso", "mendrisio", "bellinzona", "locarno", "stabio", "manno",
     "balerna", "novazzano", "agno", "bioggio", "biasca", "giubiasco", "coldrerio", "morbio", "vacallo",
@@ -29,7 +38,7 @@ _SVIZZERA = ["switzerland", "svizzera", "schweiz", "suisse", "zurich", "zurigo",
 # chiave → (nome mostrato, parole riconosciute, località per LinkedIn, località per jobs.ch)
 PRESETS: Dict[str, Tuple[str, List[str], List[str], List[str]]] = {
     "lombardia": ("Lombardia", _LOMBARDIA, ["Lombardy, Italy"], []),
-    "milano": ("Milano", _LOMBARDIA, ["Milan, Lombardy, Italy"], []),
+    "milano": ("Milano", _MILANO, ["Milan, Lombardy, Italy"], []),
     "ticino": ("Canton Ticino", _TICINO, ["Canton of Ticino, Switzerland"], ["Ticino"]),
     "svizzera": ("Svizzera", _SVIZZERA, ["Switzerland"], [""]),
     "italia": ("Italia", ["italy", "italia"], ["Italy"], []),
@@ -84,22 +93,31 @@ def jobsch_locations(zones: List[str]) -> List[str]:
     return list(dict.fromkeys(out))
 
 
-def detect_remote(job: Job) -> bool:
-    if job.remote:
-        return True
-    return bool(_REMOTE_RE.search(fold(f"{job.title} {job.location}")))
+# Località "solo paese": tipiche degli annunci full remote su LinkedIn.
+_COUNTRY_ONLY = re.compile(r"^(italy|italia|switzerland|svizzera|schweiz|suisse|europe|europa|emea|"
+                           r"european union|european economic area|unione europea)$")
 
 
-def location_match(job: Job, zones: List[str]) -> Tuple[Optional[bool], str]:
-    """(True, zona) se la località rientra nelle zone, (False, '') se no, (None, '') se ignota."""
+def is_country_only(job: Job) -> bool:
+    loc = re.sub(r"[^a-z ]+", " ", _REMOTE_RE.sub(" ", fold(job.location))).strip()
+    return bool(_COUNTRY_ONLY.match(re.sub(r"\s+", " ", loc)))
+
+
+def location_match(job: Job, zones: List[str], mode: Optional[str] = None) -> Tuple[Optional[bool], str]:
+    """(True, zona) se la località rientra nelle zone, (False, '') se no, (None, '') se ignota.
+    `mode` è la modalità di lavoro se già nota (dopo aver letto la descrizione)."""
     loc = fold(job.location)
-    if detect_remote(job) and any(is_remote_zone(z) for z in zones):
-        rest = _REMOTE_RE.sub(" ", loc)
-        rest = re.sub(r"[^a-z]+", " ", rest).strip()
+    wants_remote = any(is_remote_zone(z) for z in zones)
+    remote = mode == "remote" or job.remote or bool(_REMOTE_RE.search(fold(f"{job.title} {job.location}")))
+    if remote and wants_remote:
+        rest = re.sub(r"[^a-z]+", " ", _REMOTE_RE.sub(" ", loc)).strip()
         if not rest or _REMOTE_OK_REGION.search(loc):
             return True, "Remote"
     if not loc.strip():
         return None, ""
+    if wants_remote and is_country_only(job):
+        # "Italy" senza città: forse full remote. Lo dirà la descrizione (mode).
+        return (None, "") if mode is None else (False, "")
     for z in zones:
         if is_remote_zone(z):
             continue

@@ -33,7 +33,13 @@ GitHub Actions (cron)
 | Seniority | 10 | Penalità per titoli junior, troppi anni richiesti, ruoli da direttore |
 | Lingue | −10 / −3 | Lingua richiesta (o solo gradita) che non hai nel profilo |
 
-Filtri rigidi, che scartano l'annuncio: parole escluse nel titolo, aziende escluse, zona sbagliata, RAL dichiarata sotto il minimo, nessuna delle parole obbligatorie.
+Filtri rigidi, che scartano l'annuncio:
+- parole escluse nel titolo, aziende escluse, zona sbagliata;
+- **modalità di lavoro** non ammessa (`work_modes`: remote / hybrid / onsite, ricavata dal testo dell'annuncio);
+- **RAL** dichiarata sotto il minimo. Se è "a partire da X", scarta solo se X è sotto il 65% del minimo;
+- **% di skill**: quota delle skill citate nell'annuncio che possiedi (le "parenti" valgono mezza), sotto `min_skill_match`;
+- **lingue**: con `languages_strict`, annunci che richiedono (o sono scritti in) una lingua che non hai;
+- nessuna delle parole obbligatorie.
 
 ## Installazione (una volta sola)
 
@@ -71,6 +77,10 @@ Nel repository: **Settings → Secrets and variables → Actions → New reposit
 | `/aziende add satispay` · `/aziende add <link pagina carriere>` | Segue un sito carriere (Greenhouse, Lever, Workable, SmartRecruiters, Recruitee, Personio) |
 | `/ral 50000` · `/ral_chf 95k` | RAL minima (scarta solo annunci con RAL dichiarata più bassa) |
 | `/soglia 60` | Punteggio minimo per la notifica |
+| `/skill_min 60` | % minima di skill richieste che possiedi |
+| `/modalita remote, hybrid` · `/modalita tutte` | Modalità di lavoro ammesse |
+| `/modalita_ignota scarta` · `tieni` | Cosa fare se l'annuncio non dice la modalità |
+| `/lingue_obbligatorie on` · `off` | Scarta gli annunci che richiedono lingue che non hai |
 | `/escludi add junior` · `/obbligatorie add bigquery` | Filtri extra |
 | `/silenzio 23 7` | Notifiche senza suono di notte |
 | `/stato` · `/ultimi` · `/pausa` · `/riprendi` | Gestione |
@@ -93,7 +103,7 @@ Scrive `profilo.json` (in chiaro, escluso da git) nella cartella del progetto. M
 
 Prima controlla il file, poi mette in pausa il bot, aspetta che finisca l'eventuale giro in corso, pubblica il profilo cifrato e riattiva il bot. Se nel frattempo hai cambiato il profilo da Telegram, si ferma e ti chiede di riscaricarlo, così non perdi nessuna modifica.
 
-Campi principali di `profilo.json`: `skills` (nome → livello 1–5), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `min_score`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
+Campi principali di `profilo.json`: `skills` (nome → livello 1–5), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `min_score`, `min_skill_match` (0–100), `work_modes` (`["remote", "hybrid"]`, vuota = tutte), `work_mode_strict`, `languages_strict`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
 
 ## Fonti e limiti
 

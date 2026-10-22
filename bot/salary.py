@@ -19,16 +19,22 @@ _PATTERNS = [
 ]
 
 
+_OPEN = re.compile(r"(a partire da|partire da|starting( from| at)?|from|minimum|minimo|almeno|at least|ab|des|da)\s*:?\s*$")
+
+
 @dataclass
 class Salary:
     low: float
     high: float
     currency: str  # "EUR" | "CHF"
     text: str
+    open_ended: bool = False   # "a partire da 45.000": è il minimo della fascia, non il massimo
 
     def short(self) -> str:
         sym = "€" if self.currency == "EUR" else "CHF"
         lo, hi = round(self.low / 1000), round(self.high / 1000)
+        if self.open_ended and lo == hi:
+            return f"da {lo}k {sym}"
         return f"{lo}k {sym}" if lo == hi else f"{lo}–{hi}k {sym}"
 
 
@@ -59,5 +65,7 @@ def parse_salary(text: str) -> Optional[Salary]:
             if not all(15_000 <= n <= 400_000 for n in nums):
                 continue
             cur = "CHF" if any(c in ("chf", "fr.", "sfr") for c in curs) else "EUR"
-            return Salary(min(nums), max(nums), cur, m.group(0).strip())
+            before = t[max(0, m.start() - 30):m.start()]
+            open_ended = len(nums) == 1 and bool(_OPEN.search(before))
+            return Salary(min(nums), max(nums), cur, m.group(0).strip(), open_ended)
     return None

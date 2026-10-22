@@ -46,7 +46,11 @@ HELP = """<b>Comandi</b>
 <b>Valori</b>
 /ral 45000 · /ral off – RAL minima in € (scarta solo annunci con RAL dichiarata più bassa)
 /ral_chf 90000 · /ral_chf off – lo stesso per gli annunci in CHF
-/soglia 55 – punteggio minimo per ricevere la notifica
+/soglia 60 – punteggio minimo per ricevere la notifica
+/skill_min 60 – % minima di skill richieste che possiedi (0 = nessun vincolo)
+/modalita remote, hybrid · /modalita tutte – modalità di lavoro ammesse (remote, hybrid, onsite)
+/modalita_ignota scarta · /modalita_ignota tieni – annunci che non dicono la modalità
+/lingue_obbligatorie on · off – on: scarta annunci che richiedono lingue che non hai
 /eta 48 – ignora annunci pubblicati da più di N ore
 /esperienza 6 – anni di esperienza
 /silenzio 23 7 · /silenzio off – notifiche senza suono di notte
@@ -100,7 +104,11 @@ def profile_summary(p: dict) -> str:
         f"<b>Esclusi nel titolo:</b> {escape(', '.join(p['exclude_words'])) or '—'}",
         f"<b>Aziende escluse:</b> {escape(', '.join(p['exclude_companies'])) or '—'}",
         f"<b>Parole obbligatorie:</b> {escape(', '.join(p['required_words'])) or '—'}",
-        f"<b>Soglia:</b> {p['min_score']}/100 · <b>Età massima:</b> {p['max_age_hours']} h",
+        f"<b>Soglia:</b> {p['min_score']}/100 · <b>Skill minime:</b> {p.get('min_skill_match', 0)}% · "
+        f"<b>Età massima:</b> {p['max_age_hours']} h",
+        f"<b>Modalità:</b> {escape(', '.join(p.get('work_modes') or ['tutte']))}"
+        f" (se non indicata: {'scarta' if p.get('work_mode_strict') else 'tieni'})",
+        f"<b>Lingue obbligatorie che non parli:</b> {'scarta' if p.get('languages_strict') else 'penalizza'}",
         f"<b>Silenzio:</b> {f'{qh[0]}:00–{qh[1]}:00' if qh else 'off'}",
         f"<b>Fonti:</b> " + ", ".join(f"{k} {'✅' if v else '⛔'}" for k, v in p["sources"].items()),
         f"<b>Siti carriere seguiti:</b> {len(p['companies'])} (/aziende)",
@@ -201,6 +209,27 @@ def _handle_value(p: dict, cmd: str, arg: str) -> Optional[str]:
         if len(parts) == 2:
             p["quiet_hours"] = [parts[0] % 24, parts[1] % 24]
             return f"Notifiche silenziose dalle {parts[0]}:00 alle {parts[1]}:00"
+    if cmd == "skill_min" and _num(a) is not None:
+        p["min_skill_match"] = max(0, min(100, _num(a)))
+        return f"Ti avviso solo se possiedi almeno il {p['min_skill_match']}% delle skill richieste"
+    if cmd == "modalita":
+        if a in ("tutte", "off", "all"):
+            p["work_modes"] = []
+        else:
+            alias = {"remoto": "remote", "full remote": "remote", "ibrido": "hybrid", "in sede": "onsite",
+                     "sede": "onsite", "on-site": "onsite"}
+            modes = [alias.get(v.strip(), v.strip()) for v in a.split(",") if v.strip()]
+            if not modes or any(m not in ("remote", "hybrid", "onsite") for m in modes):
+                return "Uso: /modalita remote, hybrid · /modalita tutte"
+            p["work_modes"] = modes
+        return f"Modalità ammesse: {', '.join(p['work_modes']) or 'tutte'}"
+    if cmd == "modalita_ignota" and a in ("scarta", "tieni"):
+        p["work_mode_strict"] = a == "scarta"
+        return f"Annunci senza modalità indicata: {a}"
+    if cmd == "lingue_obbligatorie" and a in ("on", "off"):
+        p["languages_strict"] = a == "on"
+        return ("Scarto gli annunci che richiedono lingue che non hai in /lingue" if a == "on"
+                else "Le lingue che non hai tolgono punti ma non scartano l'annuncio")
     if cmd == "fonti":
         parts = a.split()
         if len(parts) == 2 and parts[0] in p["sources"] and parts[1] in ("on", "off"):

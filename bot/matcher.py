@@ -6,6 +6,11 @@ Composizione del punteggio:
   zona               10  (5 se la località non è indicata)
   seniority          10  (penalità per junior, anni richiesti troppi, ruoli da direttore)
   lingue            -10  se l'annuncio chiede una lingua che non hai (-3 se solo gradita)
+
+Filtri rigidi (scartano l'annuncio): azienda o parola nel titolo escluse, ruolo non pertinente,
+fuori zona, modalità di lavoro non ammessa, RAL dichiarata sotto il minimo, nessuna parola
+obbligatoria, % di skill possedute sotto `min_skill_match`, lingua obbligatoria che non parli
+(se `languages_strict`).
 """
 from __future__ import annotations
 
@@ -16,6 +21,7 @@ from typing import Dict, List, Optional, Tuple
 from .models import Job, fold
 from .salary import Salary, parse_salary
 from .skills import canonical, extract_skills
+from .workmode import text_language, work_mode
 from .zones import location_match
 
 # Skill "parenti": se hai una skill della famiglia, le altre valgono in parte.
@@ -30,6 +36,7 @@ FAMILIES = [
     ["Kafka", "Pub/Sub", "Flink", "Streaming"],
 ]
 PARTIAL_CREDIT = 0.4
+OPEN_SALARY_RATIO = 0.65
 
 _LANGS = {
     "tedesco": r"(german|tedesco|deutsch)",
@@ -50,6 +57,8 @@ class Match:
     missing: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     salary: Optional[Salary] = None
+    mode: Optional[str] = None          # remote | hybrid | onsite | None
+    skill_pct: Optional[int] = None     # % delle skill citate che possiedi (simili = mezza)
 
 
 def _tokens(s: str) -> List[str]:
@@ -126,17 +135,53 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
     salary = parse_salary(text)
     if salary:
         floor = profile.get("ral_min_chf") if salary.currency == "CHF" else profile.get("ral_min_eur")
-        if floor and salary.high < floor:
+        # Con "a partire da X" il massimo è ignoto: scarta solo se X è molto sotto il minimo.
+        if floor and (salary.low < OPEN_SALARY_RATIO * floor if salary.open_ended else salary.high < floor):
             return None, f"RAL sotto il minimo ({salary.short()})"
 
     warnings: List[str] = []
+
+    # Modalità di lavoro
+    mode = work_mode(job)
+    modes = profile.get("work_modes") or []
+    if modes and mode and mode not in modes:
+        return None, f"modalità {mode}"
+    if modes and not mode:
+        if profile.get("work_mode_strict"):
+            return None, "modalità di lavoro non indicata"
+        warnings.append("modalità di lavoro non indicata")
+
+    # Lingue: con languages_strict una lingua obbligatoria che non parli scarta l'annuncio
+    have = {fold(l) for l in profile.get("languages", [])}
+    strict = profile.get("languages_strict", False)
+    written_in = text_language(job.description)
+    if strict and written_in and written_in not in have:
+        return None, f"annuncio scritto in {written_in}"
+    s_lang = 0
+    for name, pat in _LANGS.items():
+        if name in have:
+            continue
+        hits = [sent for sent in re.split(r"[.\n;•]", tf) if re.search(r"(?<![a-z])" + pat + r"(?![a-z])", sent)]
+        if not hits:
+            continue
+        if all(re.search(_NICE, sent) for sent in hits):
+            s_lang -= 3
+            warnings.append(f"{name} gradito")
+        else:
+            if strict:
+                return None, f"richiesto il {name}"
+            s_lang -= 10
+            warnings.append(f"richiesto il {name}")
+        break
 
     # Ruolo
     frac, role = role_match(job.title, profile.get("roles", []))
     s_role = 25 if frac >= 0.999 else 15
 
-    # Zona
-    ok, zone = location_match(job, profile.get("zones", []))
+    # Zona (ricontrollata ora che la modalità è nota: "Italy" vale solo se full remote)
+    ok, zone = location_match(job, profile.get("zones", []), mode)
+    if ok is False:
+        return None, "fuori zona"
     s_zone = 10 if ok else 5
     if ok is None:
         warnings.append("località non indicata")
@@ -155,7 +200,11 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
             credit += PARTIAL_CREDIT * mine[kin] / 5
         else:
             missing.append(s)
+    skill_pct = None
     if wanted:
+        skill_pct = int(round(100 * (len(matched) + 0.5 * len(similar)) / len(wanted)))
+        if skill_pct < profile.get("min_skill_match", 0):
+            return None, f"skill possedute {skill_pct}%"
         # Con poche skill citate il giudizio è incerto: il denominatore minimo è 5.
         coverage = credit / max(len(wanted), 5)
         s_skill = 55 * min(1.0, coverage * 1.15)
@@ -178,22 +227,5 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
         s_sen -= 8
         warnings.append(f"chiede {max(years)}+ anni di esperienza")
 
-    # Lingue: penalità piena se richiesta, lieve se solo "gradita"
-    s_lang = 0
-    have = {fold(l) for l in profile.get("languages", [])}
-    for name, pat in _LANGS.items():
-        if name in have:
-            continue
-        hits = [sent for sent in re.split(r"[.\n;•]", tf) if re.search(r"(?<![a-z])" + pat + r"(?![a-z])", sent)]
-        if not hits:
-            continue
-        if all(re.search(_NICE, sent) for sent in hits):
-            s_lang -= 3
-            warnings.append(f"{name} gradito")
-        else:
-            s_lang -= 10
-            warnings.append(f"richiesto il {name}")
-        break
-
     score = int(round(max(0, min(100, s_role + s_zone + s_skill + s_sen + s_lang))))
-    return Match(score, role, zone or "", matched, similar, missing, warnings, salary), ""
+    return Match(score, role, zone or "", matched, similar, missing, warnings, salary, mode, skill_pct), ""

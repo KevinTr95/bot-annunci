@@ -7,6 +7,7 @@ from typing import Optional
 
 from .matcher import Match
 from .models import Job
+from .workmode import LABELS
 
 SOURCE_LABEL = {"linkedin": "LinkedIn", "jobs.ch": "jobs.ch", "greenhouse": "sito carriere",
                 "lever": "sito carriere", "workable": "sito carriere", "smartrecruiters": "sito carriere",
@@ -32,12 +33,13 @@ def age_text(dt: Optional[datetime]) -> str:
 def job_message(job: Job, m: Match) -> str:
     lines = [f"🆕 <b>{escape(job.title)}</b>", f"🏢 {escape(job.company)}"]
     where = escape(job.location or "località non indicata")
-    if m.zone == "Remote" and "remot" not in where.lower():
-        where += " · 🏠 remoto"
+    if m.mode:
+        where += f" · {LABELS[m.mode]}"
     lines.append(f"📍 {where}")
     if m.salary:
         lines.append(f"💰 {escape(m.salary.short())}")
-    lines.append(f"🎯 <b>{m.score}/100</b> {score_bar(m.score)}")
+    pct = f" · skill {m.skill_pct}%" if m.skill_pct is not None else ""
+    lines.append(f"🎯 <b>{m.score}/100</b> {score_bar(m.score)}{pct}")
     if m.matched:
         lines.append("✅ " + escape(", ".join(m.matched[:8])))
     if m.similar:

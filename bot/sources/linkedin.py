@@ -25,7 +25,7 @@ def _text(node) -> str:
     return " ".join(node.get_text(" ").split()) if node else ""
 
 
-def _parse_cards(html: str, remote: bool) -> List[Job]:
+def _parse_cards(html: str) -> List[Job]:
     soup = BeautifulSoup(html, "html.parser")
     jobs = []
     for card in soup.select("div.base-card[data-entity-urn]"):
@@ -42,7 +42,6 @@ def _parse_cards(html: str, remote: bool) -> List[Job]:
             url=(link["href"].split("?")[0] if link else f"https://www.linkedin.com/jobs/view/{job_id}"),
             posted_at=parse_dt(when.get("datetime")) if when else None,
             description=salary,
-            remote=remote,
             needs_detail=True,
         ))
     return jobs
@@ -58,13 +57,13 @@ def fetch(profile: dict, window_hours: int) -> List[Job]:
     locations = linkedin_locations(profile.get("zones", []))
     seen, out = set(), []
     try:
-        for loc, remote in locations:
+        # La ricerca pubblica ignora il filtro "remoto" (f_WT): per il remoto si cerca su tutto
+        # il paese e la modalità si ricava poi dalla descrizione.
+        for loc in dict.fromkeys(loc for loc, _ in locations):
             for page in range(MAX_PAGES):
                 params = {"keywords": query, "location": loc, "f_TPR": f"r{window_hours * 3600}",
                           "sortBy": "DD", "start": page * 10}
-                if remote:
-                    params["f_WT"] = "2"
-                cards = _parse_cards(http.get(SEARCH, params=params).text, remote)
+                cards = _parse_cards(http.get(SEARCH, params=params).text)
                 for j in cards:
                     if j.source_id not in seen:
                         seen.add(j.source_id)

@@ -54,6 +54,8 @@ def _lever_list(slug: str, name: str) -> List[Job]:
             url=j["hostedUrl"], posted_at=parse_dt(j.get("createdAt")),
             description="\n".join([j.get("descriptionPlain", ""), lists, j.get("additionalPlain", "")]),
             remote=j.get("workplaceType") == "remote",
+            extra={"workplace": {"remote": "remote", "hybrid": "hybrid", "onsite": "onsite"}.get(
+                j.get("workplaceType", ""), "")},
         ))
     return out
 
