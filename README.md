@@ -19,6 +19,20 @@ GitHub Actions (cron)
 
 **Orari**: un giro ogni 5 minuti, 24 ore su 24 (il minimo consentito da GitHub; nei repository pubblici i minuti sono illimitati). GitHub non è puntuale: nelle ore di punta alcuni giri partono in ritardo o saltano, quindi nella pratica l'intervallo è di 5–15 minuti.
 
+**Avvio dei giri**: i giri programmati di GitHub (`schedule`) sui repository nuovi possono partire con ore di ritardo o non partire affatto. Per questo il bot viene avviato da **[cron-job.org](https://cron-job.org)** ogni 5 minuti con una chiamata all'API di GitHub:
+
+```
+POST https://api.github.com/repos/KevinTr95/bot-annunci/actions/workflows/bot.yml/dispatches
+Accept: application/vnd.github+json
+Authorization: Bearer <token fine-grained: solo questo repo, permesso Actions: Read and write>
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+
+{"ref":"main"}
+```
+
+Risposta attesa: `204 No Content`. Il token ha una scadenza: quando scade cron-job.org riceve `401` e, con le notifiche attive, manda un'email. Va rigenerato su GitHub e aggiornato nell'header `Authorization`. Il `schedule` interno del workflow resta come riserva.
+
 **Privacy**: profilo e stato stanno nel branch `bot-state` cifrati con la chiave `STATE_KEY` (secret del repository). Il profilo in `bot/default_profile.json` è solo un modello generico; i log pubblici contengono soltanto conteggi. Se perdi `STATE_KEY` il bot non riesce più a leggere lo stato: va cancellato il branch `bot-state` e si riparte da zero.
 
 **Solo annunci nuovi**: il bot ricorda gli annunci già visti e ignora quelli pubblicati da più di `/eta` ore (48 per default). Per jobs.ch usa la data della *prima* pubblicazione, così un annuncio ripubblicato non sembra nuovo. Lo stesso annuncio trovato su due fonti arriva una volta sola.
