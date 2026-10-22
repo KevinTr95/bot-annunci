@@ -9,7 +9,7 @@ on:
 
 # Mai due giri in parallelo: si pesterebbero lo stato.
 concurrency:
-  group: job-bot
+  group: job-bot-v2   # v2: il gruppo "job-bot" ha un giro fantasma bloccato in coda lato GitHub
   cancel-in-progress: false
 
 permissions:
