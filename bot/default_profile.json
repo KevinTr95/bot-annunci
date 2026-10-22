@@ -1,0 +1,37 @@
+{
+  "roles": [
+    "data engineer",
+    "analytics engineer",
+    "etl developer",
+    "etl engineer",
+    "bi engineer",
+    "bi developer",
+    "data platform engineer",
+    "big data engineer",
+    "cloud data engineer",
+    "data warehouse engineer",
+    "data warehouse developer",
+    "dwh developer",
+    "data integration engineer",
+    "data integration developer"
+  ],
+  "keywords": ["data engineer", "analytics engineer", "etl developer"],
+  "zones": ["Milano"],
+  "skills": {"SQL": 3, "Python": 3},
+  "languages": ["italiano", "inglese"],
+  "years_experience": 0,
+  "ral_min_eur": null,
+  "ral_min_chf": null,
+  "exclude_words": [
+    "stage", "stagista", "tirocinio", "tirocinante", "internship", "intern", "praktikum",
+    "praktikant", "werkstudent", "apprendistato", "apprenticeship", "graduate program", "phd"
+  ],
+  "exclude_companies": [],
+  "required_words": [],
+  "min_score": 60,
+  "max_age_hours": 48,
+  "quiet_hours": [23, 7],
+  "sources": {"linkedin": true, "jobs.ch": true, "aziende": true},
+  "companies": [],
+  "paused": false
+}

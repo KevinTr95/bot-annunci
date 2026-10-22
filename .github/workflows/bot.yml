@@ -1,0 +1,62 @@
+name: job-bot
+
+on:
+  schedule:
+    # Ogni 5 minuti, il minimo consentito da GitHub (repo pubblico: minuti illimitati).
+    # GitHub non è puntuale: nelle ore di punta alcuni giri partono in ritardo o saltano.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+# Mai due giri in parallelo: si pesterebbero lo stato.
+concurrency:
+  group: job-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # salvare lo stato nel branch bot-state
+  actions: write    # tenere attivo il workflow (vedi ultimo passo)
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        id: py
+        with:
+          python-version: "3.12"
+
+      # Ambiente Python in cache: evita il pip install a ogni giro (i minuti sono contati).
+      - uses: actions/cache@v4
+        id: venv
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
+
+      - if: steps.venv.outputs.cache-hit != 'true'
+        run: python -m venv .venv && .venv/bin/pip install -q -r requirements.txt
+
+      - name: Carica stato
+        run: bash scripts/state.sh load
+
+      - name: Giro del bot
+        run: .venv/bin/python -m bot.main
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+
+      - name: Salva stato
+        if: always()
+        run: bash scripts/state.sh save
+
+      # Nei repo pubblici GitHub sospende i workflow programmati dopo 60 giorni senza attività:
+      # riattivarlo a ogni giro azzera il conteggio.
+      - name: Mantieni attivo il workflow
+        if: always()
+        continue-on-error: true
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/bot.yml/enable" --silent
+        env:
+          GH_TOKEN: ${{ github.token }}
