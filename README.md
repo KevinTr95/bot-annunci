@@ -77,6 +77,24 @@ Nel repository: **Settings → Secrets and variables → Actions → New reposit
 
 `/aiuto` mostra l'elenco completo. **I comandi vengono letti al giro successivo**, quindi la risposta può arrivare dopo 5–15 minuti.
 
+## Modificare il profilo da file
+
+In alternativa ai comandi Telegram, dal Mac (servono `STATE_KEY` nel file `.env` e `gh` autenticato):
+
+```bash
+.venv/bin/python -m bot.profile_cli scarica
+```
+
+Scrive `profilo.json` (in chiaro, escluso da git) nella cartella del progetto. Modificalo con qualsiasi editor, poi:
+
+```bash
+.venv/bin/python -m bot.profile_cli carica
+```
+
+Prima controlla il file, poi mette in pausa il bot, aspetta che finisca l'eventuale giro in corso, pubblica il profilo cifrato e riattiva il bot. Se nel frattempo hai cambiato il profilo da Telegram, si ferma e ti chiede di riscaricarlo, così non perdi nessuna modifica.
+
+Campi principali di `profilo.json`: `skills` (nome → livello 1–5), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `min_score`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
+
 ## Fonti e limiti
 
 | Fonte | Stato |

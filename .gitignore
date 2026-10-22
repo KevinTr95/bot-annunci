@@ -5,3 +5,5 @@ __pycache__/
 data/
 .scratch-data/
 .DS_Store
+profilo.json
+.profilo.base.json
