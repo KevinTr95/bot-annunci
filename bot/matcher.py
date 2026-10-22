@@ -2,7 +2,7 @@
 
 Composizione del punteggio:
   ruolo nel titolo   25  (15 se il titolo combacia solo in parte)
-  skill              55  (copertura delle skill citate, pesata sul tuo livello)
+  skill              55  (copertura delle skill citate; una skill "parente" vale 0.4)
   zona               10  (5 se la località non è indicata)
   seniority          10  (penalità per junior, anni richiesti troppi, ruoli da direttore)
   lingue            -10  se l'annuncio chiede una lingua che non hai (-3 se solo gradita)
@@ -187,17 +187,17 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
         warnings.append("località non indicata")
 
     # Skill
-    mine: Dict[str, int] = {canonical(k): int(v) for k, v in profile.get("skills", {}).items()}
-    wanted = extract_skills(text, extra=mine.keys())
-    matched = sorted((s for s in wanted if s in mine), key=lambda s: (-mine[s], s))
+    mine = {canonical(s) for s in profile.get("skills", [])}
+    wanted = extract_skills(text, extra=mine)
+    matched = sorted(s for s in wanted if s in mine)
     similar: List[Tuple[str, str]] = []
     missing: List[str] = []
-    credit = sum(mine[s] / 5 for s in matched)
+    credit = float(len(matched))
     for s in sorted(wanted - set(matched)):
         kin = next((m for fam in FAMILIES if s in fam for m in fam if m in mine and m != s), None)
         if kin:
             similar.append((s, kin))
-            credit += PARTIAL_CREDIT * mine[kin] / 5
+            credit += PARTIAL_CREDIT
         else:
             missing.append(s)
     skill_pct = None

@@ -31,7 +31,7 @@ HELP = """<b>Comandi</b>
 📎 <i>invia il CV in PDF</i> – aggiorna le skill dal CV
 
 <b>Liste</b> (senza argomenti mostrano la lista; più valori separati da virgola)
-/skill add dbt:4, spark · /skill rm qlik – livello 1-5, default 3
+/skill add dbt, spark · /skill rm qlik
 /ruoli add data architect · /ruoli rm bi developer
 /keyword add data engineer · /keyword rm dbt
 /zone add Torino · /zone rm Remote
@@ -90,8 +90,7 @@ def _parse_action(arg: str) -> Tuple[str, str]:
 
 
 def profile_summary(p: dict) -> str:
-    skills = sorted(p["skills"].items(), key=lambda kv: (-int(kv[1]), kv[0]))
-    sk = ", ".join(f"{escape(k)} {'●' * int(v)}" for k, v in skills) or "—"
+    sk = escape(", ".join(sorted(p["skills"], key=str.lower))) or "—"
     qh = p.get("quiet_hours")
     lines = [
         "<b>👤 Il tuo profilo</b>",
@@ -137,21 +136,20 @@ def _handle_list(p: dict, cmd: str, arg: str) -> str:
 
 def _handle_skill(p: dict, arg: str) -> str:
     action, rest = _parse_action(arg)
-    skills: Dict[str, int] = p["skills"]
+    skills: List[str] = p["skills"]
     if action == "add":
         for v in _split(rest):
-            name, _, lvl = v.partition(":")
-            level = int(lvl) if lvl.strip().isdigit() else 3
-            skills[canonical(name)] = max(1, min(5, level))
+            name = canonical(v.split(":")[0])   # un eventuale ":4" dei vecchi comandi viene ignorato
+            if name not in skills:
+                skills.append(name)
     elif action == "rm":
-        for v in _split(rest):
-            skills.pop(canonical(v), None)
+        drop = {canonical(v.split(":")[0]).lower() for v in _split(rest)}
+        p["skills"] = skills = [s for s in skills if s.lower() not in drop]
     elif arg:
-        return "Uso: /skill add dbt:4, spark · /skill rm qlik"
-    rows = sorted(skills.items(), key=lambda kv: (-int(kv[1]), kv[0]))
-    body = "\n".join(f"{'●' * int(v)}{'○' * (5 - int(v))} {escape(k)}"
-                     + ("" if k in SKILLS else " <i>(cercata letteralmente)</i>") for k, v in rows)
-    return f"<b>Le tue skill</b> (livello 1-5)\n{body}"
+        return "Uso: /skill add dbt, spark · /skill rm qlik"
+    body = "\n".join(f"• {escape(k)}" + ("" if k in SKILLS else " <i>(cercata letteralmente)</i>")
+                     for k in sorted(skills, key=str.lower))
+    return f"<b>Le tue skill</b> ({len(skills)})\n{body or '—'}"
 
 
 def _handle_companies(p: dict, arg: str) -> str:
@@ -273,16 +271,15 @@ def _handle_cv(p: dict, tg: Telegram, doc: dict) -> str:
         return "Mandami il CV in formato PDF."
     _, skills, languages = parse_cv(tg.download(doc["file_id"]))
     added = sorted(s for s in skills if s not in p["skills"])
-    for s in added:
-        p["skills"][s] = 3
+    p["skills"].extend(added)
     for lang in languages:
         if lang not in p["languages"]:
             p["languages"].append(lang)
     p["cv_updated_at"] = int(time.time())
     msg = [f"📄 CV letto: trovate {len(skills)} skill."]
     if added:
-        msg.append("Nuove (livello 3): " + escape(", ".join(added)))
-    msg.append("Regola i livelli con /skill add nome:livello (1-5), togli quelle sbagliate con /skill rm.")
+        msg.append("Aggiunte: " + escape(", ".join(added)))
+    msg.append("Togli quelle sbagliate con /skill rm, aggiungi quelle mancanti con /skill add.")
     msg.append("Quando hai finito controlla tutto con /profilo.")
     return "\n".join(msg)
 

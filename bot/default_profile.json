@@ -17,7 +17,7 @@
   ],
   "keywords": ["data engineer", "analytics engineer", "etl developer"],
   "zones": ["Milano"],
-  "skills": {"SQL": 3, "Python": 3},
+  "skills": ["SQL", "Python"],
   "languages": ["italiano", "inglese"],
   "years_experience": 0,
   "ral_min_eur": null,

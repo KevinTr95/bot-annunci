@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime
 from pathlib import Path
 
 from .config import ROOT, STATE_KEY
@@ -58,9 +59,8 @@ def _validate(p: dict) -> list:
     for key in lists:
         if not isinstance(p.get(key), list) or not all(isinstance(x, str) for x in p[key]):
             errors.append(f"«{key}» deve essere una lista di testi, es. [\"a\", \"b\"]")
-    if not isinstance(p.get("skills"), dict) or not all(
-            isinstance(v, int) and 1 <= v <= 5 for v in p["skills"].values()):
-        errors.append("«skills» deve essere {\"SQL\": 5, \"dbt\": 4, ...} con livelli interi da 1 a 5")
+    if not isinstance(p.get("skills"), list) or not all(isinstance(x, str) for x in p["skills"]):
+        errors.append("«skills» deve essere una lista di testi, es. [\"SQL\", \"dbt\"]")
     for key in ("ral_min_eur", "ral_min_chf"):
         if p.get(key) is not None and not isinstance(p[key], int):
             errors.append(f"«{key}» deve essere un numero intero (es. 50000) oppure null")
@@ -100,8 +100,12 @@ def scarica() -> None:
 def _wait_idle(timeout: int = 240) -> None:
     deadline = time.time() + timeout
     while time.time() < deadline:
-        out = _run("gh", "run", "list", "--workflow", WORKFLOW, "-L", "5", "--json", "status")
-        if not any(r["status"] in ("in_progress", "queued", "waiting", "pending") for r in json.loads(out)):
+        out = _run("gh", "run", "list", "--workflow", WORKFLOW, "-L", "5", "--json", "status,createdAt")
+        # Un giro vero dura meno di un minuto: quelli "in coda" da più di 10 minuti sono
+        # rimasti incastrati lato GitHub e non toccheranno lo stato.
+        recent = [r for r in json.loads(out)
+                  if time.time() - datetime.fromisoformat(r["createdAt"].replace("Z", "+00:00")).timestamp() < 600]
+        if not any(r["status"] in ("in_progress", "queued", "waiting", "pending") for r in recent):
             return
         print("  ⏳ c'è un giro in corso, aspetto…")
         time.sleep(10)

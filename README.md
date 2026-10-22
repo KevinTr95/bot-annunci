@@ -28,7 +28,7 @@ GitHub Actions (cron)
 | Componente | Punti | Come |
 |---|---|---|
 | Ruolo | 25 (15 se parziale) | Il titolo contiene uno dei tuoi `/ruoli` |
-| Skill | 55 | Skill citate nell'annuncio coperte dalle tue, pesate sul tuo livello 1–5. Una skill "parente" vale in parte (Snowflake ≈ BigQuery, Informatica ≈ Talend, Power BI ≈ Qlik…) |
+| Skill | 55 | Quota delle skill citate nell'annuncio che possiedi. Una skill "parente" vale in parte (Snowflake ≈ BigQuery, Informatica ≈ Talend, Power BI ≈ Qlik…) |
 | Zona | 10 (5 se non indicata) | Località dentro le tue `/zone` |
 | Seniority | 10 | Penalità per titoli junior, troppi anni richiesti, ruoli da direttore |
 | Lingue | −10 / −3 | Lingua richiesta (o solo gradita) che non hai nel profilo |
@@ -68,9 +68,9 @@ Nel repository: **Settings → Secrets and variables → Actions → New reposit
 
 | Comando | Cosa fa |
 |---|---|
-| *invia il CV in PDF* | Aggiunge al profilo le skill trovate (livello 3) |
+| *invia il CV in PDF* | Aggiunge al profilo le skill trovate |
 | `/profilo` | Riepilogo completo |
-| `/skill add dbt:4, spark` · `/skill rm qlik` | Skill con livello 1–5 |
+| `/skill add dbt, spark` · `/skill rm qlik` | Le tue skill |
 | `/zone add Torino` · `/zone rm Remote` | Lombardia, Milano, Ticino, Svizzera, Italia, Remote o una città |
 | `/ruoli add data architect` | Ruoli confrontati col titolo |
 | `/keyword add spark` | Parole cercate su LinkedIn e jobs.ch |
@@ -103,7 +103,7 @@ Scrive `profilo.json` (in chiaro, escluso da git) nella cartella del progetto. M
 
 Prima controlla il file, poi mette in pausa il bot, aspetta che finisca l'eventuale giro in corso, pubblica il profilo cifrato e riattiva il bot. Se nel frattempo hai cambiato il profilo da Telegram, si ferma e ti chiede di riscaricarlo, così non perdi nessuna modifica.
 
-Campi principali di `profilo.json`: `skills` (nome → livello 1–5), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `min_score`, `min_skill_match` (0–100), `work_modes` (`["remote", "hybrid"]`, vuota = tutte), `work_mode_strict`, `languages_strict`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
+Campi principali di `profilo.json`: `skills` (lista, es. `["SQL", "dbt"]`), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `min_score`, `min_skill_match` (0–100), `work_modes` (`["remote", "hybrid"]`, vuota = tutte), `work_mode_strict`, `languages_strict`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
 
 ## Fonti e limiti
 

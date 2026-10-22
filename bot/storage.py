@@ -53,6 +53,8 @@ def default_profile() -> dict:
 def load_profile() -> dict:
     profile = default_profile()
     profile.update(_read(PROFILE_PATH, {}))   # campi nuovi del default restano disponibili
+    if isinstance(profile.get("skills"), dict):   # vecchio formato {skill: livello}
+        profile["skills"] = sorted(profile["skills"])
     return profile
 
 
