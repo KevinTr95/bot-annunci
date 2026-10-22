@@ -36,8 +36,7 @@ def job_message(job: Job, m: Match) -> str:
     if m.mode:
         where += f" · {LABELS[m.mode]}"
     lines.append(f"📍 {where}")
-    if m.salary:
-        lines.append(f"💰 {escape(m.salary.short())}")
+    lines.append(f"💰 {escape(m.salary.short())}" if m.salary else "💰 RAL non indicata")
     pct = f" · skill {m.skill_pct}%" if m.skill_pct is not None else ""
     lines.append(f"🎯 <b>{m.score}/100</b> {score_bar(m.score)}{pct}")
     if m.matched:
