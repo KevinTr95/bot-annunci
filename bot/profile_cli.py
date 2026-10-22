@@ -127,7 +127,9 @@ def carica() -> None:
             data = Path(tmp)
             _fetch_state(data)
             current = _load_profile_from(data)
-            if BASE_FILE.exists() and json.loads(BASE_FILE.read_text()) != current:
+            # Confronto solo sui campi già scaricati: quelli nuovi del modello non contano come modifiche.
+            base = json.loads(BASE_FILE.read_text()) if BASE_FILE.exists() else None
+            if base is not None and any(current.get(k) != v for k, v in base.items()):
                 sys.exit("❌ Nel frattempo il profilo è stato cambiato dal bot (comandi Telegram). "
                          "Riscaricalo con `scarica`, rifai le modifiche e ricarica.")
             _save_profile_to(data, profile)
