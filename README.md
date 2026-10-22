@@ -30,7 +30,7 @@ GitHub Actions (cron)
 | Ruolo | 25 (15 se parziale) | Il titolo contiene uno dei tuoi `/ruoli` |
 | Skill | 55 | Quota delle skill citate nell'annuncio che possiedi. Una skill "parente" vale in parte (Snowflake ≈ BigQuery, Informatica ≈ Talend, Power BI ≈ Qlik…) |
 | Zona | 10 (5 se non indicata) | Località dentro le tue `/zone` |
-| Seniority | 10 | Penalità per titoli junior, troppi anni richiesti, ruoli da direttore |
+| Seniority | 10 | Penalità per titoli junior e ruoli da direttore; −4 per ogni anno richiesto oltre i tuoi |
 | Lingue | −10 / −3 | Lingua richiesta (o solo gradita) che non hai nel profilo |
 
 Filtri rigidi, che scartano l'annuncio:
@@ -39,6 +39,7 @@ Filtri rigidi, che scartano l'annuncio:
 - **RAL** dichiarata sotto il minimo. Se è "a partire da X", scarta solo se X è sotto il 65% del minimo;
 - **% di skill**: quota delle skill citate nell'annuncio che possiedi (le "parenti" valgono mezza), sotto `min_skill_match`;
 - **lingue**: con `languages_strict`, annunci che richiedono (o sono scritti in) una lingua che non hai;
+- **esperienza**: annunci che chiedono più di `years_experience + max_extra_years` anni (6 + 2: 8 passa, 9 no);
 - nessuna delle parole obbligatorie.
 
 ## Installazione (una volta sola)
@@ -82,6 +83,7 @@ Nel repository: **Settings → Secrets and variables → Actions → New reposit
 | `/modalita_ignota scarta` · `tieni` | Cosa fare se l'annuncio non dice la modalità |
 | `/lingue_obbligatorie on` · `off` | Scarta gli annunci che richiedono lingue che non hai |
 | `/escludi add junior` · `/obbligatorie add bigquery` | Filtri extra |
+| `/esperienza 6` · `/esperienza_extra 2` | Anni di esperienza e tolleranza |
 | `/silenzio 23 7` | Notifiche senza suono di notte |
 | `/stato` · `/ultimi` · `/pausa` · `/riprendi` | Gestione |
 

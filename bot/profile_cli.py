@@ -74,6 +74,9 @@ def _validate(p: dict) -> list:
     for c in p.get("companies", []):
         if not {"name", "ats", "slug"} <= set(c):
             errors.append(f"azienda incompleta: {c} (servono name, ats, slug)")
+    for key in ("years_experience", "max_extra_years"):
+        if not isinstance(p.get(key, 0), int) or p.get(key, 0) < 0:
+            errors.append(f"«{key}» deve essere un intero >= 0")
     if not isinstance(p.get("min_skill_match", 0), int) or not 0 <= p.get("min_skill_match", 0) <= 100:
         errors.append("«min_skill_match» deve essere un intero fra 0 e 100")
     if not set(p.get("work_modes") or []) <= {"remote", "hybrid", "onsite"}:

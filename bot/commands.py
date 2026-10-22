@@ -53,6 +53,7 @@ HELP = """<b>Comandi</b>
 /lingue_obbligatorie on · off – on: scarta annunci che richiedono lingue che non hai
 /eta 48 – ignora annunci pubblicati da più di N ore
 /esperienza 6 – anni di esperienza
+/esperienza_extra 2 – anni in più tollerati (chiedono 8 con 6+2: passa; 9: scartato)
 /silenzio 23 7 · /silenzio off – notifiche senza suono di notte
 /fonti linkedin off · /fonti jobs.ch on · /fonti aziende on
 
@@ -98,7 +99,8 @@ def profile_summary(p: dict) -> str:
         f"<b>Parole di ricerca:</b> {escape(', '.join(p['keywords']))}",
         f"<b>Zone:</b> {escape(', '.join(p['zones']))}",
         f"<b>Skill:</b> {sk}",
-        f"<b>Lingue:</b> {escape(', '.join(p['languages']))} · <b>Esperienza:</b> {p['years_experience']} anni",
+        f"<b>Lingue:</b> {escape(', '.join(p['languages']))} · <b>Esperienza:</b> {p['years_experience']} anni "
+        f"(tollero annunci che ne chiedono fino a {p['years_experience'] + p.get('max_extra_years', 2)})",
         f"<b>RAL minima:</b> {p['ral_min_eur'] or '—'} € · {p['ral_min_chf'] or '—'} CHF",
         f"<b>Esclusi nel titolo:</b> {escape(', '.join(p['exclude_words'])) or '—'}",
         f"<b>Aziende escluse:</b> {escape(', '.join(p['exclude_companies'])) or '—'}",
@@ -199,6 +201,10 @@ def _handle_value(p: dict, cmd: str, arg: str) -> Optional[str]:
     if cmd == "esperienza" and _num(a) is not None:
         p["years_experience"] = _num(a)
         return f"Esperienza: {p['years_experience']} anni"
+    if cmd == "esperienza_extra" and _num(a) is not None:
+        p["max_extra_years"] = _num(a)
+        return (f"Scarto gli annunci che chiedono più di {p['years_experience'] + p['max_extra_years']} "
+                f"anni di esperienza")
     if cmd == "silenzio":
         if a == "off":
             p["quiet_hours"] = None

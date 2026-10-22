@@ -10,7 +10,7 @@ Composizione del punteggio:
 Filtri rigidi (scartano l'annuncio): azienda o parola nel titolo escluse, ruolo non pertinente,
 fuori zona, modalità di lavoro non ammessa, RAL dichiarata sotto il minimo, nessuna parola
 obbligatoria, % di skill possedute sotto `min_skill_match`, lingua obbligatoria che non parli
-(se `languages_strict`).
+(se `languages_strict`), anni di esperienza richiesti oltre `years_experience + max_extra_years`.
 """
 from __future__ import annotations
 
@@ -43,6 +43,22 @@ _LANGS = {
     "francese": r"(french|francese|francais)",
     "spagnolo": r"(spanish|spagnolo|espanol)",
 }
+# Anni di esperienza richiesti: il numero deve stare vicino a "experience/esperienza/...",
+# così "fondata 20 anni fa" o "da oltre 30 anni sul mercato" non contano.
+_EXP_WORD = r"(experience|esperienza|erfahrung|berufserfahrung|professional|working|work experience|in (a )?similar|nel ruolo|in ruoli)"
+_YEARS = r"(\d{1,2})\s*\+?\s*(?:(?:-|–|to|a|bis)\s*\d{1,2}\s*\+?\s*)?(?:years?|anni|yrs|jahre|ans)"
+_YEARS_AFTER = re.compile(_YEARS + r"(?:\s+\w+){0,6}?\s*(?:of\s+|di\s+)?" + _EXP_WORD)
+_YEARS_BEFORE = re.compile(_EXP_WORD + r"[^.\n]{0,40}?(?:almeno|at least|minimum|minimo|min\.?|mindestens|oltre|over|more than)?\s*" + _YEARS)
+
+
+def required_years(text_fold: str) -> Optional[int]:
+    """Anni minimi richiesti (in un intervallo "3-5 anni" conta il 3); None se non indicati."""
+    found = [int(m.group(1)) for m in _YEARS_AFTER.finditer(text_fold)]
+    found += [int(m.group(m.lastindex)) for m in _YEARS_BEFORE.finditer(text_fold)]
+    found = [y for y in found if 1 <= y <= 15]   # oltre 15 è quasi sempre la storia dell'azienda
+    return max(found) if found else None
+
+
 _NICE = r"(plus|nice to have|preferred|advantage|bonus|gradit|vantaggio|apprezzat|preferenziale|von vorteil)"
 _STOP = {"di", "dei", "del", "the", "of", "and", "e", "&", "-", "/"}
 
@@ -221,11 +237,13 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
     if re.search(r"(?<![a-z])(head of|director|direttore|vp|vice president|chief)(?![a-z])", title_f):
         s_sen -= 6
         warnings.append("ruolo dirigenziale")
-    years = [int(y) for y in re.findall(r"(\d{1,2})\s*\+?\s*(?:years|anni|yrs|jahre|ans)", tf) if int(y) < 25]
     yoe = int(profile.get("years_experience", 0) or 0)
-    if years and yoe and max(years) > yoe + 2:
-        s_sen -= 8
-        warnings.append(f"chiede {max(years)}+ anni di esperienza")
+    years = required_years(tf)
+    if years and yoe and years > yoe:
+        if years > yoe + int(profile.get("max_extra_years", 2)):
+            return None, f"chiede {years} anni di esperienza"
+        s_sen -= 4 * (years - yoe)
+        warnings.append(f"chiede {years} anni (ne hai {yoe})")
 
     score = int(round(max(0, min(100, s_role + s_zone + s_skill + s_sen + s_lang))))
     return Match(score, role, zone or "", matched, similar, missing, warnings, salary, mode, skill_pct), ""

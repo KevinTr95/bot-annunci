@@ -20,6 +20,7 @@
   "skills": ["SQL", "Python"],
   "languages": ["italiano", "inglese"],
   "years_experience": 0,
+  "max_extra_years": 2,
   "ral_min_eur": null,
   "ral_min_chf": null,
   "exclude_words": [
