@@ -119,6 +119,8 @@ Scrive `profilo.json` (in chiaro, escluso da git) nella cartella del progetto. M
 
 Prima controlla il file, poi mette in pausa il bot, aspetta che finisca l'eventuale giro in corso, pubblica il profilo cifrato e riattiva il bot. Se nel frattempo hai cambiato il profilo da Telegram, si ferma e ti chiede di riscaricarlo, così non perdi nessuna modifica.
 
+**Modifiche temporanee**: in `overrides` un campo può avere un valore valido fino a una data, compresa, poi torna quello normale. Esempio: `"overrides": {"min_skill_match": {"value": 45, "until": "2026-10-23"}}`.
+
 Campi principali di `profilo.json`: `skills` (lista, es. `["SQL", "dbt"]`), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `min_score`, `min_skill_match` (0–100), `work_modes` (`["remote", "hybrid"]`, vuota = tutte), `work_mode_strict`, `languages_strict`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
 
 ## Fonti e limiti

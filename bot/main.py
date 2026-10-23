@@ -24,7 +24,7 @@ from .matcher import Match, evaluate, prefilter
 from .models import Job
 from .notify import job_message
 from .sources import ats, build_tasks, fetch_detail
-from .storage import load_profile, load_state, save_profile, save_state
+from .storage import effective_profile, load_profile, load_state, save_profile, save_state
 from .telegram import Telegram
 
 ALERT_AFTER_FAILS = 6   # ~2 ore di errori di fila prima di avvisarti
@@ -146,6 +146,7 @@ def run(dry_run: bool = False) -> None:
         _log("Telegram non configurato: imposta TELEGRAM_BOT_TOKEN e scrivi /start al bot.")
         save_state(state)
         return
+    profile = effective_profile(profile)   # da qui in poi valgono anche le modifiche temporanee
     if profile.get("paused"):
         _log("in pausa")
         state["last_run"] = int(t0)

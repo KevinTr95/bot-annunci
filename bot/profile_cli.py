@@ -84,6 +84,9 @@ def _validate(p: dict) -> list:
     for key in ("work_mode_strict", "languages_strict"):
         if not isinstance(p.get(key, False), bool):
             errors.append(f"«{key}» deve essere true o false")
+    for key, o in (p.get("overrides") or {}).items():
+        if not (isinstance(o, dict) and "value" in o and len(str(o.get("until", ""))) == 10):
+            errors.append(f"«overrides.{key}» deve essere {{\"value\": ..., \"until\": \"AAAA-MM-GG\"}}")
     if not p.get("roles"):
         errors.append("«roles» non può essere vuota")
     return errors

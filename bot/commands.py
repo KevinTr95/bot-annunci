@@ -12,7 +12,7 @@ from .cv import parse_cv
 from .notify import age_text
 from .skills import SKILLS, canonical
 from .sources import ats
-from .storage import default_profile
+from .storage import default_profile, effective_profile
 from .telegram import Telegram
 
 # comando → (campo del profilo, descrizione)
@@ -114,6 +114,11 @@ def profile_summary(p: dict) -> str:
         f"<b>Fonti:</b> " + ", ".join(f"{k} {'✅' if v else '⛔'}" for k, v in p["sources"].items()),
         f"<b>Siti carriere seguiti:</b> {len(p['companies'])} (/aziende)",
     ]
+    eff = effective_profile(p)
+    for key, o in (p.get("overrides") or {}).items():
+        if eff.get(key) != p.get(key):
+            lines.insert(1, f"⏳ <b>Temporaneo:</b> {escape(key)} = {escape(str(o.get('value')))} "
+                            f"fino al {escape(str(o.get('until')))} (poi {escape(str(p.get(key)))})")
     if p.get("paused"):
         lines.insert(1, "⏸ <b>In pausa</b> – /riprendi per riattivare")
     return "\n".join(lines)

@@ -58,6 +58,22 @@ def load_profile() -> dict:
     return profile
 
 
+def effective_profile(profile: dict) -> dict:
+    """Copia del profilo con applicate le modifiche temporanee ancora valide.
+
+    `overrides` = {"campo": {"value": ..., "until": "AAAA-MM-GG"}}: il valore vale fino a quel
+    giorno compreso (ora italiana), poi torna quello normale. Il profilo salvato non cambia."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from .config import TIMEZONE
+    today = datetime.now(ZoneInfo(TIMEZONE)).date().isoformat()
+    eff = dict(profile)
+    for key, o in (profile.get("overrides") or {}).items():
+        if isinstance(o, dict) and today <= str(o.get("until", "")):
+            eff[key] = o.get("value")
+    return eff
+
+
 def save_profile(profile: dict) -> None:
     _write(PROFILE_PATH, profile)
 
