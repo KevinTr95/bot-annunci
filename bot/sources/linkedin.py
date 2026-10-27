@@ -5,6 +5,7 @@ dagli IP dei datacenter. In quel caso il giro continua con le altre fonti.
 """
 from __future__ import annotations
 
+import math
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,9 @@ from ..zones import linkedin_locations
 SEARCH = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 DETAIL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{id}"
 MAX_PAGES = 3
+PAUSE = 1.5          # secondi fra una richiesta e l'altra
+RETRY_WAIT = 6       # attesa prima di riprovare dopo un 429
+TIME_LIMIT = 22      # oltre, le zone mancanti passano al giro dopo (resta tempo per i dettagli)
 
 
 def _text(node) -> str:
@@ -52,29 +56,61 @@ def _or_query(keywords: List[str]) -> str:
     return " OR ".join(f'"{k}"' if " " in k else k for k in keywords)
 
 
-def fetch(profile: dict, window_hours: int) -> List[Job]:
+def _get_with_retry(params: dict, ls: dict) -> str:
+    """Una richiesta di ricerca; se LinkedIn risponde 429 aspetta e riprova una volta."""
+    for attempt in range(2):
+        try:
+            return http.get(SEARCH, params=params).text
+        except http.RateLimited:
+            ls.setdefault("blocked", []).append(int(time.time()))
+            if attempt:
+                raise
+            time.sleep(RETRY_WAIT)
+    raise AssertionError("irraggiungibile")
+
+
+def fetch(profile: dict, ls: dict) -> List[Job]:
+    """Ricerca su tutte le zone. `ls` è lo stato LinkedIn del bot (state["linkedin"]):
+    - loc_ok: zona → ultima ricerca completata, da cui si calcola la finestra di quella zona;
+    - blocked: istanti dei 429 ricevuti (per /stato).
+
+    Le zone si cercano partendo da quella aggiornata meno di recente: se LinkedIn ci blocca a
+    metà giro, al giro dopo si riparte proprio da quelle rimaste indietro, e con una finestra
+    abbastanza ampia da coprire il tempo perso."""
     query = _or_query(profile.get("keywords", []))
-    locations = linkedin_locations(profile.get("zones", []))
-    seen, out = set(), []
+    now = time.time()
+    loc_ok = ls.setdefault("loc_ok", {})
+    # La ricerca pubblica ignora il filtro "remoto" (f_WT): per il remoto si cerca su tutto
+    # il paese e la modalità si ricava poi dalla descrizione.
+    locations = list(dict.fromkeys(loc for loc, _ in linkedin_locations(profile.get("zones", []))))
+    locations.sort(key=lambda loc: loc_ok.get(loc, 0))
+    ls["blocked"] = [t for t in ls.get("blocked", []) if now - t < 3600]
+
+    seen, out, done = set(), [], 0
     try:
-        # La ricerca pubblica ignora il filtro "remoto" (f_WT): per il remoto si cerca su tutto
-        # il paese e la modalità si ricava poi dalla descrizione.
-        for loc in dict.fromkeys(loc for loc, _ in locations):
+        for loc in locations:
+            if time.time() - now > TIME_LIMIT:
+                break
+            last = loc_ok.get(loc)
+            hours = 24 if not last else min(24, max(1, math.ceil((now - last) / 3600 + 0.5)))
             for page in range(MAX_PAGES):
-                params = {"keywords": query, "location": loc, "f_TPR": f"r{window_hours * 3600}",
+                params = {"keywords": query, "location": loc, "f_TPR": f"r{hours * 3600}",
                           "sortBy": "DD", "start": page * 10}
-                cards = _parse_cards(http.get(SEARCH, params=params).text)
+                cards = _parse_cards(_get_with_retry(params, ls))
                 for j in cards:
                     if j.source_id not in seen:
                         seen.add(j.source_id)
                         out.append(j)
-                time.sleep(1.0)
-                if len(cards) < 10:
+                time.sleep(PAUSE)
+                if len(cards) < 10:   # pagina non piena: non ce ne sono altre
                     break
+            loc_ok[loc] = int(now)
+            done += 1
     except http.RateLimited:
-        if not out:
+        if not done and not out:
             raise
-        # Bloccati a metà: teniamo quello che abbiamo, il resto al prossimo giro.
+        # Bloccati a metà: teniamo quello che abbiamo, le zone mancanti passano davanti al giro dopo.
+    ls["last_partial"] = done < len(locations)
     return out
 
 

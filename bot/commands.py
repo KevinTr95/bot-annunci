@@ -261,6 +261,12 @@ def _status(p: dict, state: dict) -> str:
     for name, h in sorted(state["sources"].items()):
         if h.get("fails"):
             bad.append(f"⚠️ {escape(name)}: {h['fails']} errori di fila ({escape(h.get('last_error', '')[:80])})")
+    ls = state.get("linkedin", {})
+    blocked = [t for t in ls.get("blocked", []) if time.time() - t < 3600]
+    late = [f"{escape(loc)} ({datetime.fromtimestamp(t, tz).strftime('%H:%M')})"
+            for loc, t in ls.get("loc_ok", {}).items() if time.time() - t > 15 * 60]
+    lines.append(f"LinkedIn: {len(blocked)} blocchi (429) nell'ultima ora"
+                 + (f" · zone non aggiornate da oltre 15 min: {', '.join(late)}" if late else " · tutte le zone aggiornate"))
     ok = sum(1 for h in state["sources"].values() if not h.get("fails"))
     lines.append(f"Fonti ok: {ok}")
     lines += bad

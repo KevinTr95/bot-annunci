@@ -26,6 +26,7 @@ from .notify import job_message
 from .sources import ats, build_tasks, fetch_detail
 from .storage import effective_profile, load_profile, load_state, save_profile, save_state
 from .telegram import Telegram
+from .zones import linkedin_locations
 
 ALERT_AFTER_FAILS = 6   # ~2 ore di errori di fila prima di avvisarti
 
@@ -153,13 +154,12 @@ def run(dry_run: bool = False) -> None:
         save_state(state)
         return
 
-    # Finestra di ricerca LinkedIn: dall'ultimo giro riuscito (+1h di margine), fra 1 e 24 ore.
-    last_li = state.get("last_linkedin_ok")
-    window = 24 if not last_li else min(24, max(1, math.ceil((t0 - last_li) / 3600 + 1)))
-
-    jobs, alerts, first_ok = _collect(build_tasks(profile, window), state)
-    if state["sources"].get("linkedin", {}).get("fails") == 0:
-        state["last_linkedin_ok"] = int(t0)
+    # LinkedIn gestisce da sé zone e finestre di ricerca (vedi sources/linkedin.py). Al primo giro
+    # con questa logica le zone partono dall'ultimo giro riuscito, non da 24 ore fa.
+    ls = state.setdefault("linkedin", {})
+    if "loc_ok" not in ls and state.get("last_linkedin_ok"):
+        ls["loc_ok"] = {loc: state["last_linkedin_ok"] for loc, _ in linkedin_locations(profile.get("zones", []))}
+    jobs, alerts, first_ok = _collect(build_tasks(profile, ls), state)
 
     now = time.time()
     max_age = profile.get("max_age_hours", 48) * 3600

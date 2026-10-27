@@ -9,11 +9,11 @@ from . import ats, jobsch, linkedin
 Task = Tuple[str, Callable[[], List[Job]]]
 
 
-def build_tasks(profile: dict, linkedin_window_hours: int) -> List[Task]:
+def build_tasks(profile: dict, linkedin_state: dict) -> List[Task]:
     enabled = profile.get("sources", {})
     tasks: List[Task] = []
     if enabled.get("linkedin", True):
-        tasks.append(("linkedin", lambda: linkedin.fetch(profile, linkedin_window_hours)))
+        tasks.append(("linkedin", lambda: linkedin.fetch(profile, linkedin_state)))
     if enabled.get("jobs.ch", True):
         tasks.append(("jobs.ch", lambda: jobsch.fetch(profile)))
     if enabled.get("aziende", True):
