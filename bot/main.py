@@ -69,11 +69,12 @@ def _in_quiet_hours(profile: dict) -> bool:
     return start <= h < end if start < end else (h >= start or h < end)
 
 
-def _collect(tasks, state: dict) -> Tuple[List[Job], List[str], set]:
-    """Esegue le fonti in parallelo e aggiorna la loro salute. Restituisce
-    (annunci, messaggi di allarme/ripristino, fonti alla prima raccolta riuscita)."""
+def _collect(tasks, state: dict) -> Tuple[List[Job], List[str], set, List[str]]:
+    """Esegue le fonti in parallelo e aggiorna la loro salute. Restituisce (annunci, messaggi di
+    allarme/ripristino, fonti alla prima raccolta riuscita, siti carriere guasti da ~2 ore)."""
     jobs: List[Job] = []
     alerts: List[str] = []
+    broken: List[str] = []
     first_ok = set()
     with ThreadPoolExecutor(max_workers=8) as ex:
         futures = {ex.submit(fn): name for name, fn in tasks}
@@ -87,6 +88,9 @@ def _collect(tasks, state: dict) -> Tuple[List[Job], List[str], set]:
                 _log(f"{name}: ERRORE {h['last_error']}")
                 if h["fails"] >= ALERT_AFTER_FAILS and not h["alerted"]:
                     h["alerted"] = True
+                    if name.startswith("azienda:"):
+                        broken.append(name)   # prima di avvisare si prova a ritrovarla (_repair_company)
+                        continue
                     alerts.append(f"⚠️ La fonte <b>{escape(name)}</b> non risponde da {h['fails']} giri: "
                                   f"{escape(h['last_error'][:120])}")
                 continue
@@ -99,7 +103,7 @@ def _collect(tasks, state: dict) -> Tuple[List[Job], List[str], set]:
             for j in found:
                 j.extra["task"] = name
             jobs.extend(found)
-    return jobs, alerts, first_ok
+    return jobs, alerts, first_ok, broken
 
 
 def _linkedin_details(jobs: List[Job], deadline: float) -> List[Job]:
@@ -148,6 +152,30 @@ def _fetch_details(jobs: List[Job], deadline: float) -> List[Job]:
     return ready
 
 
+def _repair_company(profile: dict, task: str, state: dict) -> Tuple[str, bool]:
+    """Un sito carriere che non risponde da ~2 ore spesso ha solo cambiato ATS (es. da Greenhouse
+    ad Ashby): lo si cerca di nuovo per nome e, se lo si trova altrove, si aggiorna il profilo.
+    Restituisce (messaggio per Telegram, profilo cambiato)."""
+    name = task.split(":", 1)[1]
+    company = next((c for c in profile.get("companies", []) if c.get("name") == name), None)
+    err = state["sources"].get(task, {}).get("last_error", "")
+    found = None
+    if company:
+        try:
+            found = ats.detect(name)
+        except Exception:
+            found = None
+    if company and found and (found[0], found[1]) != (company["ats"], company["slug"]):
+        old = company["ats"]
+        company.update(ats=found[0], slug=found[1])
+        state["sources"].pop(task, None)   # riparte come fonte nuova: niente raffica di annunci vecchi
+        return (f"🔄 <b>{escape(name)}</b> ha cambiato sito carriere ({old} → {found[0]}, "
+                f"{found[2]} annunci aperti): l'ho aggiornato, la seguo da lì."), True
+    return (f"⚠️ Il sito carriere di <b>{escape(name)}</b> non risponde da {ALERT_AFTER_FAILS} giri "
+            f"({escape(err[:100])}) e non lo ritrovo altrove. Se ha cambiato pagina: "
+            f"<code>/aziende rm {escape(name)}</code> e poi <code>/aziende add</code> col link nuovo."), False
+
+
 def run(dry_run: bool = False) -> None:
     t0 = time.time()
     profile, state = load_profile(), load_state()
@@ -165,6 +193,7 @@ def run(dry_run: bool = False) -> None:
         _log("Telegram non configurato: imposta TELEGRAM_BOT_TOKEN e scrivi /start al bot.")
         save_state(state)
         return
+    saved_profile = profile
     profile = effective_profile(profile)   # da qui in poi valgono anche le modifiche temporanee
     if profile.get("paused"):
         _log("in pausa")
@@ -177,7 +206,12 @@ def run(dry_run: bool = False) -> None:
     ls = state.setdefault("linkedin", {})
     if "loc_ok" not in ls and state.get("last_linkedin_ok"):
         ls["loc_ok"] = {loc: state["last_linkedin_ok"] for loc, _ in linkedin_locations(profile.get("zones", []))}
-    jobs, alerts, first_ok = _collect(build_tasks(profile, ls), state)
+    jobs, alerts, first_ok, broken = _collect(build_tasks(profile, ls), state)
+    for task in broken:
+        msg, changed = _repair_company(saved_profile, task, state)
+        alerts.append(msg)
+        if changed and not dry_run:
+            save_profile(saved_profile)
 
     now = time.time()
     max_age = profile.get("max_age_hours", 48) * 3600

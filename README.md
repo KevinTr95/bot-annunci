@@ -89,7 +89,7 @@ Nel repository: **Settings → Secrets and variables → Actions → New reposit
 | `/zone add Torino` · `/zone rm Remote` | Lombardia, Milano, Ticino, Svizzera, Italia, Remote o una città |
 | `/ruoli add data architect` | Ruoli confrontati col titolo |
 | `/keyword add spark` | Parole cercate su LinkedIn e jobs.ch |
-| `/aziende add satispay` · `/aziende add <link pagina carriere>` | Segue un sito carriere (Greenhouse, Lever, Workable, SmartRecruiters, Recruitee, Personio) |
+| `/aziende add satispay` · `/aziende add <link pagina carriere>` | Segue un sito carriere (Greenhouse, Lever, Workable, SmartRecruiters, Recruitee, Personio, Ashby) |
 | `/ral 50000` · `/ral_chf 95k` | RAL minima (scarta solo annunci con RAL dichiarata più bassa) |
 | `/soglia 60` | Punteggio minimo per la notifica |
 | `/skill_min 60` | % minima di skill richieste che possiedi |

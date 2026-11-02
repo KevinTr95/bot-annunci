@@ -168,7 +168,7 @@ def _handle_companies(p: dict, arg: str) -> str:
         if not found:
             return (f"Non trovo una pagina carriere compatibile per «{escape(rest)}». "
                     "Prova col link della pagina lavora-con-noi (Greenhouse, Lever, Workable, "
-                    "SmartRecruiters, Recruitee o Personio).")
+                    "SmartRecruiters, Recruitee, Personio o Ashby).")
         kind, slug, n = found
         name = rest[:1].upper() + rest[1:] if not rest.startswith("http") else slug.replace("-", " ").title()
         p["companies"] = [c for c in p["companies"] if c["slug"] != slug] + [

@@ -11,7 +11,7 @@ from .workmode import LABELS
 
 SOURCE_LABEL = {"linkedin": "LinkedIn", "jobs.ch": "jobs.ch", "greenhouse": "sito carriere",
                 "lever": "sito carriere", "workable": "sito carriere", "smartrecruiters": "sito carriere",
-                "recruitee": "sito carriere", "personio": "sito carriere"}
+                "recruitee": "sito carriere", "personio": "sito carriere", "ashby": "sito carriere"}
 
 
 def score_bar(score: int) -> str:

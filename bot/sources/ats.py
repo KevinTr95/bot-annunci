@@ -1,6 +1,6 @@
 """Pagine carriere delle aziende, lette dalle API pubbliche dei loro ATS.
 
-Supportati: Greenhouse, Lever, Workable, SmartRecruiters, Recruitee, Personio.
+Supportati: Greenhouse, Lever, Workable, SmartRecruiters, Recruitee, Personio, Ashby.
 Ogni azienda nel profilo è {"name": ..., "ats": ..., "slug": ...}.
 """
 from __future__ import annotations
@@ -128,6 +128,26 @@ def _personio_list(slug: str, name: str) -> List[Job]:
     return out
 
 
+# ---------- Ashby
+def _ashby_list(slug: str, name: str) -> List[Job]:
+    data = http.get(f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true").json()
+    out = []
+    for j in data.get("jobs", []):
+        if j.get("isListed") is False:
+            continue
+        locs = [j.get("location", "")] + [l.get("location", "") for l in j.get("secondaryLocations") or []]
+        pay = (j.get("compensation") or {}).get("compensationTierSummary") or ""   # es. "€60K – €80K"
+        mode = {"remote": "remote", "hybrid": "hybrid", "onsite": "onsite"}.get((j.get("workplaceType") or "").lower(), "")
+        out.append(Job(
+            source="ashby", source_id=f"{slug}/{j['id']}", title=j["title"].strip(), company=name or slug,
+            location=" / ".join(dict.fromkeys(filter(None, locs))), url=j.get("jobUrl", ""),
+            posted_at=parse_dt(j.get("publishedAt")),
+            description="\n".join(filter(None, [j.get("descriptionPlain", ""), pay])),
+            remote=mode == "remote", extra={"workplace": mode},
+        ))
+    return out
+
+
 LISTERS: Dict[str, Callable[[str, str], List[Job]]] = {
     "greenhouse": _gh_list,
     "lever": _lever_list,
@@ -135,6 +155,7 @@ LISTERS: Dict[str, Callable[[str, str], List[Job]]] = {
     "smartrecruiters": _sr_list,
     "recruitee": _recruitee_list,
     "personio": _personio_list,
+    "ashby": _ashby_list,
 }
 DETAIL: Dict[str, Callable[[Job], None]] = {
     "greenhouse": _gh_detail,
@@ -148,11 +169,33 @@ _URL_PATTERNS = [
     (r"(?:jobs|careers)\.smartrecruiters\.com/([\w-]+)", "smartrecruiters"),
     (r"([\w-]+)\.recruitee\.com", "recruitee"),
     (r"([\w-]+)\.jobs\.personio\.(?:de|com)", "personio"),
+    (r"(?:jobs|api)\.ashbyhq\.com/(?:posting-api/job-board/)?([\w.-]+)", "ashby"),
 ]
 
 
 def fetch_company(company: dict) -> List[Job]:
     return LISTERS[company["ats"]](company["slug"], company.get("name", ""))
+
+
+def _detect_in_page(url: str) -> Optional[Tuple[str, str, int]]:
+    """Pagina carriere sul dominio dell'azienda: cerca nel codice i link al suo ATS."""
+    try:
+        page = re.sub(r"\\+/", "/", http.get(url).text)   # link dentro JSON: https:\\/\\/...
+    except Exception:
+        return None
+    tried = set()
+    for pat, ats in _URL_PATTERNS:
+        for slug in re.findall(pat, page):
+            if (ats, slug) in tried or len(tried) > 12:
+                continue
+            tried.add((ats, slug))
+            try:
+                n = len(LISTERS[ats](slug, ""))
+            except Exception:
+                continue
+            if n:
+                return ats, slug, n
+    return None
 
 
 def detect(query: str) -> Optional[Tuple[str, str, int]]:
@@ -165,6 +208,8 @@ def detect(query: str) -> Optional[Tuple[str, str, int]]:
                 return ats, m.group(1), len(LISTERS[ats](m.group(1), ""))
             except Exception:
                 return None
+    if q.startswith("http"):
+        return _detect_in_page(q)
     base = fold(q)
     slugs = list(dict.fromkeys([re.sub(r"[^a-z0-9]", "", base), re.sub(r"[^a-z0-9]+", "-", base).strip("-")]))
     best = None
