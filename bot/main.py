@@ -21,13 +21,14 @@ from zoneinfo import ZoneInfo
 from . import config, http
 from .commands import handle_updates
 from .matcher import Match, evaluate, prefilter
-from .models import Job
+from .models import Job, parse_dt
 from .notify import job_message
 from .sources import ats, build_tasks, fetch_detail
 from .storage import effective_profile, load_profile, load_state, save_profile, save_state
 from .telegram import Telegram
 from .zones import linkedin_locations
 
+MAX_DETAIL_TRIES = 24  # ~2 ore di giri ogni 5 minuti
 ALERT_AFTER_FAILS = 6   # ~2 ore di errori di fila prima di avvisarti
 
 
@@ -36,6 +37,23 @@ def _clean(msg: str) -> str:
     if config.TELEGRAM_TOKEN:
         msg = msg.replace(config.TELEGRAM_TOKEN, "***")
     return re.sub(r"\?[^\s'\")]*", "", msg)
+
+
+def _tries(d) -> int:
+    """Tentativi già fatti per un annuncio rimandato (vecchio formato: solo il numero)."""
+    return d.get("n", 0) if isinstance(d, dict) else int(d or 0)
+
+
+def _job_to_dict(job: Job) -> dict:
+    return {"source": job.source, "source_id": job.source_id, "title": job.title, "company": job.company,
+            "location": job.location, "url": job.url, "remote": job.remote,
+            "posted_at": job.posted_at.isoformat() if job.posted_at else None,
+            "extra": {k: v for k, v in job.extra.items() if isinstance(v, (str, int, float, bool))}}
+
+
+def _job_from_dict(d: dict) -> Job:
+    return Job(d["source"], d["source_id"], d["title"], d["company"], d.get("location", ""), d.get("url", ""),
+               parse_dt(d.get("posted_at")), "", d.get("remote", False), needs_detail=True, extra=d.get("extra", {}))
 
 
 def _log(msg: str) -> None:
@@ -186,25 +204,35 @@ def run(dry_run: bool = False) -> None:
     if config.VERBOSE:
         _log(f"motivi: {skipped}")
 
-    ready = _fetch_details(list(candidates.values()), t0 + config.RUN_BUDGET_SECONDS)
-    # Chi resta senza descrizione per 3 giri viene valutato lo stesso, col solo titolo.
+    # Gli annunci rimandati nei giri precedenti tornano in coda anche se la ricerca di oggi
+    # non li restituisce più (la finestra di LinkedIn è breve), e passano per primi.
+    deferred = state.get("deferred", {})
+    for uid, d in deferred.items():
+        if isinstance(d, dict) and uid not in seen and uid not in candidates:
+            candidates[uid] = _job_from_dict(d["job"])
+    order = sorted(candidates.values(), key=lambda j: -_tries(deferred.get(j.uid)))
+    ready = _fetch_details(order, t0 + config.RUN_BUDGET_SECONDS)
+
+    # Senza descrizione non si possono applicare RAL, skill e lingue: si riprova per ~2 ore,
+    # poi si rinuncia (meglio perdere un annuncio che mandarne uno non filtrato).
     ready_ids = {j.uid for j in ready}
-    deferred = {uid: n for uid, n in state.get("deferred", {}).items() if uid in candidates}
+    new_deferred = {}
     for uid, job in candidates.items():
         if uid in ready_ids:
             continue
-        deferred[uid] = deferred.get(uid, 0) + 1
-        if deferred[uid] >= 3:
-            ready.append(job)
-    state["deferred"] = {uid: n for uid, n in deferred.items() if n < 3}
-    if len(ready) < len(candidates):
-        _log(f"{len(candidates) - len(ready)} annunci rimandati al prossimo giro")
+        n = _tries(deferred.get(uid)) + 1
+        if n >= MAX_DETAIL_TRIES:
+            seen[uid] = int(now)
+            _log(f"descrizione non disponibile dopo {n} tentativi: annuncio lasciato perdere")
+        else:
+            new_deferred[uid] = {"n": n, "job": _job_to_dict(job)}
+    state["deferred"] = new_deferred
+    if new_deferred:
+        _log(f"{len(new_deferred)} annunci rimandati al prossimo giro")
 
     matches: List[Tuple[Job, Match]] = []
     for job in ready:
         m, reason = evaluate(job, profile)
-        if m and job.needs_detail:
-            m.warnings.append("descrizione non letta: punteggio indicativo")
         if m and m.score >= profile.get("min_score", 60):
             matches.append((job, m))
         else:

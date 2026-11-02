@@ -37,9 +37,9 @@ VERBOSE = os.environ.get("BOT_VERBOSE", "") == "1"
 
 TIMEZONE = "Europe/Rome"
 
-# Secondi massimi per raccolta + dettagli: su GitHub Actions ogni giro deve
-# restare sotto il minuto fatturato. Quello che non si fa in tempo passa al giro dopo.
-RUN_BUDGET_SECONDS = int(os.environ.get("RUN_BUDGET_SECONDS", "35"))
+# Secondi massimi per raccolta + dettagli; quello che non si fa in tempo passa al giro dopo.
+# (Repo pubblico: i minuti di GitHub Actions non si pagano, ma il giro deve finire prima del successivo.)
+RUN_BUDGET_SECONDS = int(os.environ.get("RUN_BUDGET_SECONDS", "60"))
 
 # Notifiche massime per giro; le altre finiscono in un messaggio riassuntivo.
 MAX_NOTIFICATIONS_PER_RUN = 12

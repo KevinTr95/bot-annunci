@@ -7,7 +7,7 @@ from typing import Optional
 
 from .models import fold
 
-_NUM = r"(\d{2,3}(?:[.,'’ ]\d{3})?(?:[.,]\d{1,2})?\s?k?)"
+_NUM = r"(\d{2,3}(?:[.,'’ ]\d{3})(?:[.,]\d{1,2})?|\d{5,6}(?:[.,]\d{1,2})?|\d{2,3}(?:[.,]\d{1,2})?\s?k?)"
 _CUR = r"(€|eur|euro|chf|fr\.|sfr|ral)"
 _SEP = r"\s*(?:-|–|—|a|to|bis|fino a|/)\s*"
 _PATTERNS = [
