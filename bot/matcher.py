@@ -81,8 +81,24 @@ def _tokens(s: str) -> List[str]:
     return [t for t in re.findall(r"[a-z0-9+#]+", fold(s)) if t not in _STOP]
 
 
+# Titoli in italiano → equivalente inglese, confrontato con i ruoli del profilo.
+_IT_TITLES = [
+    (r"architett[oi] (?:de[il] )?dati", "data architect"),
+    (r"ingegner[ei] (?:de[il] )?dati", "data engineer"),
+    (r"sviluppator[ei] sql", "sql developer"),
+    (r"sviluppator[ei] (?:di )?(?:database|basi (?:di )?dati)", "database developer"),
+    (r"sviluppator[ei] etl", "etl developer"),
+    (r"sviluppator[ei] (?:bi|business intelligence)(?![a-z])", "bi developer"),
+    (r"sviluppator[ei] (?:di )?data ?warehouse", "data warehouse developer"),
+    (r"ingegner[ei] (?:dell.?|di |de[il] )?(?:ia|ai|intelligenza artificiale)(?![a-z])", "ai engineer"),
+]
+
+
 def role_match(title: str, roles: List[str]) -> Tuple[float, str]:
     """Quanto il titolo corrisponde al ruolo più vicino (1.0 = tutte le parole presenti)."""
+    extra = [en for pat, en in _IT_TITLES if re.search(pat, fold(title))]
+    if extra:
+        title = f"{title} | {' | '.join(extra)}"
     t_fold = fold(title)
     t_tok = _tokens(title)
     best, best_role = 0.0, ""
@@ -195,7 +211,7 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
     s_role = 25 if frac >= 0.999 else 15
 
     # Zona (ricontrollata ora che la modalità è nota: "Italy" vale solo se full remote)
-    ok, zone = location_match(job, profile.get("zones", []), mode)
+    ok, zone = location_match(job, profile.get("zones", []), mode, described=True)
     if ok is False:
         return None, "fuori zona"
     s_zone = 10 if ok else 5

@@ -49,6 +49,7 @@ Risposta attesa: `204 No Content`. Il token ha una scadenza: quando scade cron-j
 
 Filtri rigidi, che scartano l'annuncio:
 - parole escluse nel titolo, aziende escluse, zona sbagliata;
+- con `Remote` fra le zone, un annuncio in un'altra città italiana o svizzera viene letto e tenuto solo se è full remote;
 - **modalità di lavoro** non ammessa (`work_modes`: remote / hybrid / onsite, ricavata dal testo dell'annuncio);
 - **RAL** dichiarata sotto il minimo. Se è "a partire da X", scarta solo se X è sotto il 65% del minimo;
 - **% di skill**: quota delle skill citate nell'annuncio che possiedi (le "parenti" valgono mezza), sotto `min_skill_match`;

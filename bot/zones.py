@@ -103,9 +103,13 @@ def is_country_only(job: Job) -> bool:
     return bool(_COUNTRY_ONLY.match(re.sub(r"\s+", " ", loc)))
 
 
-def location_match(job: Job, zones: List[str], mode: Optional[str] = None) -> Tuple[Optional[bool], str]:
+_REMOTE_COUNTRY = re.compile(r"(?<![a-z])(italy|italia|switzerland|svizzera|schweiz|suisse)(?![a-z])")
+
+
+def location_match(job: Job, zones: List[str], mode: Optional[str] = None,
+                   described: bool = False) -> Tuple[Optional[bool], str]:
     """(True, zona) se la località rientra nelle zone, (False, '') se no, (None, '') se ignota.
-    `mode` è la modalità di lavoro se già nota (dopo aver letto la descrizione)."""
+    `mode` è la modalità di lavoro ricavata dalla descrizione; `described` dice se è già stata letta."""
     loc = fold(job.location)
     wants_remote = any(is_remote_zone(z) for z in zones)
     remote = mode == "remote" or job.remote or bool(_REMOTE_RE.search(fold(f"{job.title} {job.location}")))
@@ -125,4 +129,12 @@ def location_match(job: Job, zones: List[str], mode: Optional[str] = None) -> Tu
             if re.search(r"(?<![a-z])" + re.escape(fold(w)) + r"(?![a-z])", loc):
                 key = preset_key(z)
                 return True, PRESETS[key][0] if key else z
+    # Città fuori zona ma in Italia/Svizzera (es. "Torino" dalla ricerca "Italy"): può essere un
+    # full remote, che sulla scheda di LinkedIn non si vede. Decide la descrizione.
+    if wants_remote and (fold(job.extra.get("search", "")) in ("italy", "switzerland")
+                         or _REMOTE_COUNTRY.search(loc)):
+        if not described:
+            return None, ""
+        if mode == "remote":
+            return True, "Remote"
     return False, ""

@@ -98,6 +98,7 @@ def fetch(profile: dict, ls: dict) -> List[Job]:
                           "sortBy": "DD", "start": page * 10}
                 cards = _parse_cards(_get_with_retry(params, ls))
                 for j in cards:
+                    j.extra["search"] = loc   # serve a capire se una città fuori zona può essere remota
                     if j.source_id not in seen:
                         seen.add(j.source_id)
                         out.append(j)
