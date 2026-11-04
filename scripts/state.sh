@@ -25,8 +25,19 @@ case "${1:-}" in
     git --work-tree=data add -A -f .
     tree=$(git write-tree)
     commit=$(git commit-tree "$tree" -m "stato $(date -u +%FT%TZ)")
-    git push -q -f origin "$commit:refs/heads/$BRANCH"
-    echo "stato salvato"
+    # GitHub a volte rifiuta il push per errori suoi (500, "fatal error in commit_refs_rules"):
+    # si riprova qualche volta, altrimenti il giro dopo ripartirebbe dallo stato vecchio.
+    for wait in 5 10 20 30 0; do
+      if git push -q -f origin "$commit:refs/heads/$BRANCH"; then
+        echo "stato salvato"
+        exit 0
+      fi
+      [ "$wait" -gt 0 ] || break
+      echo "push rifiutato, riprovo fra ${wait}s"
+      sleep "$wait"
+    done
+    echo "stato NON salvato: GitHub non accetta il push" >&2
+    exit 1
     ;;
   *)
     echo "uso: $0 load|save" >&2
