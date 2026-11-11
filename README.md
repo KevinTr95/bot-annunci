@@ -33,6 +33,8 @@ Content-Type: application/json
 
 Risposta attesa: `204 No Content`. Il token ha una scadenza: quando scade cron-job.org riceve `401` e, con le notifiche attive, manda un'email. Va rigenerato su GitHub e aggiornato nell'header `Authorization`. Il `schedule` interno del workflow resta come riserva.
 
+**Messaggio di ripristino**: se uno o più giri falliscono (o per più di 20 minuti non ne parte nessuno), il primo giro riuscito manda su Telegram "✅ Il bot ha ripreso a funzionare" con gli orari e la causa: un incidente segnalato da GitHub, lo step fallito o i giri non avviati.
+
 **Privacy**: profilo e stato stanno nel branch `bot-state` cifrati con la chiave `STATE_KEY` (secret del repository). Il profilo in `bot/default_profile.json` è solo un modello generico; i log pubblici contengono soltanto conteggi. Se perdi `STATE_KEY` il bot non riesce più a leggere lo stato: va cancellato il branch `bot-state` e si riparte da zero.
 
 **Solo annunci nuovi**: il bot ricorda gli annunci già visti e ignora quelli pubblicati da più di `/eta` ore (48 per default). Per jobs.ch usa la data della *prima* pubblicazione, così un annuncio ripubblicato non sembra nuovo. Lo stesso annuncio trovato su due fonti arriva una volta sola.

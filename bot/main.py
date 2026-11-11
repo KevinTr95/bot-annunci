@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 
 from . import config, http
 from .commands import handle_updates
+from .health import recovery_message
 from .matcher import Match, evaluate, prefilter
 from .models import Job, parse_dt
 from .notify import job_message
@@ -193,6 +194,15 @@ def run(dry_run: bool = False) -> None:
         _log("Telegram non configurato: imposta TELEGRAM_BOT_TOKEN e scrivi /start al bot.")
         save_state(state)
         return
+    if not dry_run:
+        # Dopo giri falliti (o una lunga pausa) un messaggio dice che il bot ha ripreso.
+        try:
+            msg = recovery_message(state.get("last_run"))
+            if msg:
+                tg.send(chat_id, msg, silent=_in_quiet_hours(profile))
+                _log("inviato messaggio di ripristino")
+        except Exception as e:
+            _log(f"controllo ripristino: {type(e).__name__}")
     saved_profile = profile
     profile = effective_profile(profile)   # da qui in poi valgono anche le modifiche temporanee
     if profile.get("paused"):
