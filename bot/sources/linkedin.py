@@ -119,7 +119,10 @@ def fetch_detail(job: Job) -> None:
     soup = BeautifulSoup(http.get(DETAIL.format(id=job.source_id)).text, "html.parser")
     desc = soup.select_one(".show-more-less-html__markup")
     criteria = " · ".join(_text(li) for li in soup.select(".description__job-criteria-item"))
-    job.description = "\n".join(filter(None, [job.description, html_to_text(str(desc)) if desc else "", criteria]))
+    # Riquadro "Livello retribuzione di base", separato dalla descrizione
+    pay = _text(soup.select_one(".compensation__salary-range") or soup.select_one(".compensation__salary"))
+    pay = f"Retribuzione: {pay}" if pay and not pay.lower().startswith(("retribu", "livello", "base")) else pay
+    job.description = "\n".join(filter(None, [pay, job.description, html_to_text(str(desc)) if desc else "", criteria]))
     applicants = _text(soup.select_one(".num-applicants__caption"))
     if applicants:
         job.extra["applicants"] = applicants

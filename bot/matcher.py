@@ -19,10 +19,10 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from .models import Job, fold
-from .salary import Salary, parse_salary
+from .salary import Salary, job_salary
 from .skills import canonical, extract_skills
 from .workmode import text_language, work_mode
-from .zones import location_match
+from .zones import is_swiss, location_match
 
 # Skill "parenti": se hai una skill della famiglia, le altre valgono in parte.
 # L'ordine conta: come termine di paragone si sceglie la prima che possiedi.
@@ -164,7 +164,7 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
     if required and not _contains_any(tf, required):
         return None, "nessuna parola obbligatoria"
 
-    salary = parse_salary(text)
+    salary = job_salary(job, "CHF" if is_swiss(job) else "EUR")
     if salary:
         floor = profile.get("ral_min_chf") if salary.currency == "CHF" else profile.get("ral_min_eur")
         # Con "a partire da X" il massimo è ignoto: scarta solo se X è molto sotto il minimo.

@@ -11,6 +11,16 @@ SEARCH = "https://www.jobs.ch/api/v1/public/search"
 DETAIL = "https://www.jobs.ch/api/v1/public/search/job/{id}"
 
 
+def _salary_extra(d: dict) -> dict:
+    sal = d.get("salary") or {}
+    rng = sal.get("range") or {}
+    low, high = rng.get("gte") or d.get("salary_from"), rng.get("lte") or d.get("salary_to")
+    if not (low or high):
+        return {}
+    return {"sal_low": low or high, "sal_high": high or low, "sal_cur": sal.get("currency") or "CHF",
+            "sal_period": (sal.get("unit") or "YEAR").lower()}
+
+
 def _to_job(d: dict) -> Job:
     return Job(
         source="jobs.ch",
@@ -23,6 +33,7 @@ def _to_job(d: dict) -> Job:
         posted_at=parse_dt(d.get("initial_publication_date") or d.get("publication_date")),
         description=d.get("preview", ""),
         needs_detail=True,
+        extra=_salary_extra(d),
     )
 
 

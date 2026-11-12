@@ -28,8 +28,13 @@ def _gh_list(slug: str, name: str) -> List[Job]:
 
 def _gh_detail(job: Job) -> None:
     slug, jid = job.source_id.split("/", 1)
-    d = http.get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{jid}").json()
+    d = http.get(f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs/{jid}?pay_transparency=true").json()
     job.description = html_to_text(d.get("content", ""))
+    for r in d.get("pay_input_ranges") or []:   # fascia retributiva pubblicata dall'azienda
+        if r.get("min_cents") or r.get("max_cents"):
+            job.extra.update(sal_low=(r.get("min_cents") or 0) / 100, sal_high=(r.get("max_cents") or 0) / 100,
+                             sal_cur=r.get("currency_type", ""), sal_period="year")
+            break
 
 
 # ---------- Lever (account US o EU)
@@ -48,14 +53,18 @@ def _lever_list(slug: str, name: str) -> List[Job]:
     for j in data:
         cat = j.get("categories") or {}
         lists = "\n".join(f"{l.get('text', '')}\n{html_to_text(l.get('content', ''))}" for l in j.get("lists", []))
+        sr = j.get("salaryRange") or {}
+        pay = {"sal_low": sr.get("min"), "sal_high": sr.get("max"), "sal_cur": sr.get("currency", ""),
+               "sal_period": sr.get("interval", "")} if sr else {}
         out.append(Job(
             source="lever", source_id=f"{slug}/{j['id']}", title=j["text"].strip(), company=name or slug,
             location=" / ".join(cat.get("allLocations") or [cat.get("location", "")]),
             url=j["hostedUrl"], posted_at=parse_dt(j.get("createdAt")),
-            description="\n".join([j.get("descriptionPlain", ""), lists, j.get("additionalPlain", "")]),
+            description="\n".join([j.get("descriptionPlain", ""), lists, j.get("additionalPlain", ""),
+                                    j.get("salaryDescriptionPlain", "")]),
             remote=j.get("workplaceType") == "remote",
             extra={"workplace": {"remote": "remote", "hybrid": "hybrid", "onsite": "onsite"}.get(
-                j.get("workplaceType", ""), "")},
+                j.get("workplaceType", ""), ""), **pay},
         ))
     return out
 

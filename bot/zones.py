@@ -138,3 +138,11 @@ def location_match(job: Job, zones: List[str], mode: Optional[str] = None,
         if mode == "remote":
             return True, "Remote"
     return False, ""
+
+
+def is_swiss(job: Job) -> bool:
+    """Annuncio in Svizzera: serve a dare CHF agli importi scritti senza valuta."""
+    if job.source == "jobs.ch" or fold(job.extra.get("search", "")).endswith("switzerland"):
+        return True
+    loc = fold(job.location)
+    return any(re.search(r"(?<![a-z])" + re.escape(fold(w)) + r"(?![a-z])", loc) for w in _SVIZZERA)
