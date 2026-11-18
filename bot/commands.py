@@ -47,6 +47,8 @@ HELP = """<b>Comandi</b>
 /ral 45000 · /ral off – RAL minima in €
 /ral_chf 90000 · /ral_chf off – lo stesso per gli annunci in CHF
 /ral_fascia minimo · massimo – minimo: tutta la fascia sopra la RAL minima; massimo: basta il tetto
+/ral_max 100000 · /ral_max off – con /ral_fascia minimo: passa anche chi ha il massimo almeno a questa cifra
+/ral_max_chf 120000 · /ral_max_chf off – lo stesso per gli annunci in CHF
 /ral_obbligatoria on · off – on: niente notifica se la RAL non si trova
 /soglia 60 – punteggio minimo per ricevere la notifica
 /skill_min 60 – % minima di skill richieste che possiedi (0 = nessun vincolo)
@@ -105,7 +107,9 @@ def profile_summary(p: dict) -> str:
         f"(tollero annunci che ne chiedono fino a {p['years_experience'] + p.get('max_extra_years', 2)})",
         f"<b>RAL minima:</b> {p['ral_min_eur'] or '—'} € · {p['ral_min_chf'] or '—'} CHF "
         f"({'tutta la fascia sopra' if p.get('ral_floor_on_low') else 'confronto col massimo'}"
-        f"{', obbligatoria' if p.get('ral_required') else ''})",
+        f"{', obbligatoria' if p.get('ral_required') else ''})"
+        + (f"\n<b>Oppure massimo almeno:</b> {p.get('ral_ceiling_eur') or '—'} € · {p.get('ral_ceiling_chf') or '—'} CHF"
+           if p.get("ral_floor_on_low") else ""),
         f"<b>Esclusi nel titolo:</b> {escape(', '.join(p['exclude_words'])) or '—'}",
         f"<b>Aziende escluse:</b> {escape(', '.join(p['exclude_companies'])) or '—'}",
         f"<b>Parole obbligatorie:</b> {escape(', '.join(p['required_words'])) or '—'}",
@@ -239,6 +243,10 @@ def _handle_value(p: dict, cmd: str, arg: str) -> Optional[str]:
     if cmd == "modalita_ignota" and a in ("scarta", "tieni"):
         p["work_mode_strict"] = a == "scarta"
         return f"Annunci senza modalità indicata: {a}"
+    if cmd in ("ral_max", "ral_max_chf"):
+        field = "ral_ceiling_eur" if cmd == "ral_max" else "ral_ceiling_chf"
+        p[field] = None if a in ("off", "0", "no") else _num(a)
+        return f"Massimo della fascia che basta da solo ({'€' if cmd == 'ral_max' else 'CHF'}): {p[field] or 'nessuno'}"
     if cmd == "ral_fascia" and a in ("minimo", "massimo"):
         p["ral_floor_on_low"] = a == "minimo"
         return ("Tutta la fascia deve stare sopra la RAL minima" if a == "minimo"

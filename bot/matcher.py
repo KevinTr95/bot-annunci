@@ -143,7 +143,11 @@ def _below_floor(salary: Salary, profile: dict) -> bool:
     floor = profile.get("ral_min_chf") if salary.currency == "CHF" else profile.get("ral_min_eur")
     if not floor:
         return False
-    if profile.get("ral_floor_on_low"):   # tutta la fascia deve stare sopra il minimo
+    if profile.get("ral_floor_on_low"):   # tutta la fascia sopra il minimo...
+        # ...a meno che il massimo dichiarato sia abbastanza alto, qualunque sia il minimo
+        ceiling = profile.get("ral_ceiling_chf") if salary.currency == "CHF" else profile.get("ral_ceiling_eur")
+        if ceiling and not salary.open_ended and salary.high >= ceiling:
+            return False
         return salary.capped or salary.low < floor
     # Con "a partire da X" il massimo è ignoto: scarta solo se X è molto sotto il minimo.
     return salary.low < OPEN_SALARY_RATIO * floor if salary.open_ended else salary.high < floor

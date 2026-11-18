@@ -53,7 +53,7 @@ Filtri rigidi, che scartano l'annuncio:
 - parole escluse nel titolo, aziende escluse, zona sbagliata;
 - con `Remote` fra le zone, un annuncio in un'altra città italiana o svizzera viene letto e tenuto solo se è full remote;
 - **modalità di lavoro** non ammessa (`work_modes`: remote / hybrid / onsite, ricavata dal testo dell'annuncio);
-- **RAL** dichiarata sotto il minimo. Se è "a partire da X", scarta solo se X è sotto il 65% del minimo. Con `ral_floor_on_low` tutta la fascia deve stare sopra il minimo ("fino a X" non basta);
+- **RAL** dichiarata sotto il minimo. Se è "a partire da X", scarta solo se X è sotto il 65% del minimo. Con `ral_floor_on_low` tutta la fascia deve stare sopra il minimo ("fino a X" non basta), a meno che il massimo raggiunga `ral_ceiling_eur` / `ral_ceiling_chf`;
 - **RAL mancante**, con `ral_required`: la RAL si cerca nell'annuncio, nei campi della fonte e nello stesso annuncio sul sito carriere dell'azienda; se non c'è, nessuna notifica;
 - **% di skill**: quota delle skill citate nell'annuncio che possiedi (le "parenti" valgono mezza), sotto `min_skill_match`;
 - **lingue**: con `languages_strict`, annunci che richiedono (o sono scritti in) una lingua che non hai;
@@ -96,6 +96,7 @@ Nel repository: **Settings → Secrets and variables → Actions → New reposit
 | `/aziende add satispay` · `/aziende add <link pagina carriere>` | Segue un sito carriere (Greenhouse, Lever, Workable, SmartRecruiters, Recruitee, Personio, Ashby) |
 | `/ral 50000` · `/ral_chf 95k` | RAL minima |
 | `/ral_fascia minimo` · `massimo` | Confronta la RAL minima col minimo o col massimo della fascia |
+| `/ral_max 100000` · `/ral_max_chf 120000` | Con `/ral_fascia minimo`, passa anche una fascia con questo massimo, qualunque sia il minimo |
 | `/ral_obbligatoria on` · `off` | Con `on`, niente notifica se la RAL non si trova |
 | `/soglia 60` | Punteggio minimo per la notifica |
 | `/skill_min 60` | % minima di skill richieste che possiedi |
@@ -127,7 +128,7 @@ Prima controlla il file, poi mette in pausa il bot, aspetta che finisca l'eventu
 
 **Modifiche temporanee**: in `overrides` un campo può avere un valore valido fino a una data, compresa, poi torna quello normale. Esempio: `"overrides": {"min_skill_match": {"value": 45, "until": "2026-10-23"}}`.
 
-Campi principali di `profilo.json`: `skills` (lista, es. `["SQL", "dbt"]`), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `ral_required`, `ral_floor_on_low`, `min_score`, `min_skill_match` (0–100), `work_modes` (`["remote", "hybrid"]`, vuota = tutte), `work_mode_strict`, `languages_strict`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
+Campi principali di `profilo.json`: `skills` (lista, es. `["SQL", "dbt"]`), `zones`, `roles`, `keywords`, `ral_min_eur` / `ral_min_chf` (numero o `null`), `ral_required`, `ral_floor_on_low`, `ral_ceiling_eur` / `ral_ceiling_chf`, `min_score`, `min_skill_match` (0–100), `work_modes` (`["remote", "hybrid"]`, vuota = tutte), `work_mode_strict`, `languages_strict`, `max_age_hours`, `exclude_words`, `exclude_companies`, `required_words`, `quiet_hours` (`[23, 7]` o `null`), `companies` (`{"name", "ats", "slug"}`; usa `--detect nome` per trovare ats e slug).
 
 ## Fonti e limiti
 

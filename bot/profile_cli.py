@@ -61,7 +61,7 @@ def _validate(p: dict) -> list:
             errors.append(f"«{key}» deve essere una lista di testi, es. [\"a\", \"b\"]")
     if not isinstance(p.get("skills"), list) or not all(isinstance(x, str) for x in p["skills"]):
         errors.append("«skills» deve essere una lista di testi, es. [\"SQL\", \"dbt\"]")
-    for key in ("ral_min_eur", "ral_min_chf"):
+    for key in ("ral_min_eur", "ral_min_chf", "ral_ceiling_eur", "ral_ceiling_chf"):
         if p.get(key) is not None and not isinstance(p[key], int):
             errors.append(f"«{key}» deve essere un numero intero (es. 50000) oppure null")
     if not isinstance(p.get("min_score"), int) or not 0 <= p["min_score"] <= 100:

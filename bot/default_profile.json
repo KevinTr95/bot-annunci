@@ -25,6 +25,8 @@
   "ral_min_chf": null,
   "ral_required": false,
   "ral_floor_on_low": false,
+  "ral_ceiling_eur": null,
+  "ral_ceiling_chf": null,
   "exclude_words": [
     "stage", "stagista", "tirocinio", "tirocinante", "internship", "intern", "praktikum",
     "praktikant", "werkstudent", "apprendistato", "apprenticeship", "graduate program", "phd"
