@@ -23,6 +23,8 @@
   "max_extra_years": 2,
   "ral_min_eur": null,
   "ral_min_chf": null,
+  "ral_required": false,
+  "ral_floor_on_low": false,
   "exclude_words": [
     "stage", "stagista", "tirocinio", "tirocinante", "internship", "intern", "praktikum",
     "praktikant", "werkstudent", "apprendistato", "apprenticeship", "graduate program", "phd"

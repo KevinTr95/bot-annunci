@@ -44,8 +44,10 @@ HELP = """<b>Comandi</b>
 /aziende – elenco · /aziende add satispay · /aziende add https://jobs.lever.co/xyz · /aziende rm Nome
 
 <b>Valori</b>
-/ral 45000 · /ral off – RAL minima in € (scarta solo annunci con RAL dichiarata più bassa)
+/ral 45000 · /ral off – RAL minima in €
 /ral_chf 90000 · /ral_chf off – lo stesso per gli annunci in CHF
+/ral_fascia minimo · massimo – minimo: tutta la fascia sopra la RAL minima; massimo: basta il tetto
+/ral_obbligatoria on · off – on: niente notifica se la RAL non si trova
 /soglia 60 – punteggio minimo per ricevere la notifica
 /skill_min 60 – % minima di skill richieste che possiedi (0 = nessun vincolo)
 /modalita remote, hybrid · /modalita tutte – modalità di lavoro ammesse (remote, hybrid, onsite)
@@ -101,7 +103,9 @@ def profile_summary(p: dict) -> str:
         f"<b>Skill:</b> {sk}",
         f"<b>Lingue:</b> {escape(', '.join(p['languages']))} · <b>Esperienza:</b> {p['years_experience']} anni "
         f"(tollero annunci che ne chiedono fino a {p['years_experience'] + p.get('max_extra_years', 2)})",
-        f"<b>RAL minima:</b> {p['ral_min_eur'] or '—'} € · {p['ral_min_chf'] or '—'} CHF",
+        f"<b>RAL minima:</b> {p['ral_min_eur'] or '—'} € · {p['ral_min_chf'] or '—'} CHF "
+        f"({'tutta la fascia sopra' if p.get('ral_floor_on_low') else 'confronto col massimo'}"
+        f"{', obbligatoria' if p.get('ral_required') else ''})",
         f"<b>Esclusi nel titolo:</b> {escape(', '.join(p['exclude_words'])) or '—'}",
         f"<b>Aziende escluse:</b> {escape(', '.join(p['exclude_companies'])) or '—'}",
         f"<b>Parole obbligatorie:</b> {escape(', '.join(p['required_words'])) or '—'}",
@@ -235,6 +239,14 @@ def _handle_value(p: dict, cmd: str, arg: str) -> Optional[str]:
     if cmd == "modalita_ignota" and a in ("scarta", "tieni"):
         p["work_mode_strict"] = a == "scarta"
         return f"Annunci senza modalità indicata: {a}"
+    if cmd == "ral_fascia" and a in ("minimo", "massimo"):
+        p["ral_floor_on_low"] = a == "minimo"
+        return ("Tutta la fascia deve stare sopra la RAL minima" if a == "minimo"
+                else "Basta che il massimo della fascia raggiunga la RAL minima")
+    if cmd == "ral_obbligatoria" and a in ("on", "off"):
+        p["ral_required"] = a == "on"
+        return ("Niente notifica per gli annunci senza RAL" if a == "on"
+                else "Ricevi anche gli annunci senza RAL")
     if cmd == "lingue_obbligatorie" and a in ("on", "off"):
         p["languages_strict"] = a == "on"
         return ("Scarto gli annunci che richiedono lingue che non hai in /lingue" if a == "on"

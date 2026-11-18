@@ -6,6 +6,7 @@ Ogni azienda nel profilo è {"name": ..., "ats": ..., "slug": ...}.
 from __future__ import annotations
 
 import re
+import time
 import xml.etree.ElementTree as ET
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -207,8 +208,9 @@ def _detect_in_page(url: str) -> Optional[Tuple[str, str, int]]:
     return None
 
 
-def detect(query: str) -> Optional[Tuple[str, str, int]]:
-    """Da un nome o un link trova (ats, slug, numero di annunci) provando i vari ATS."""
+def detect(query: str, deadline: Optional[float] = None) -> Optional[Tuple[str, str, int]]:
+    """Da un nome o un link trova (ats, slug, numero di annunci) provando i vari ATS.
+    Con `deadline`, TimeoutError se il tempo finisce prima di averli provati tutti."""
     q = query.strip()
     for pat, ats in _URL_PATTERNS:
         m = re.search(pat, q)
@@ -224,6 +226,8 @@ def detect(query: str) -> Optional[Tuple[str, str, int]]:
     best = None
     for slug in slugs:
         for ats, lister in LISTERS.items():
+            if deadline and time.time() > deadline:
+                raise TimeoutError
             try:
                 n = len(lister(slug, ""))
             except Exception:

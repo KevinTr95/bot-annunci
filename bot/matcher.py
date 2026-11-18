@@ -136,6 +136,19 @@ def _contains_any(text_fold: str, words: List[str]) -> Optional[str]:
     return None
 
 
+RAL_MISSING = "RAL non indicata"
+
+
+def _below_floor(salary: Salary, profile: dict) -> bool:
+    floor = profile.get("ral_min_chf") if salary.currency == "CHF" else profile.get("ral_min_eur")
+    if not floor:
+        return False
+    if profile.get("ral_floor_on_low"):   # tutta la fascia deve stare sopra il minimo
+        return salary.capped or salary.low < floor
+    # Con "a partire da X" il massimo è ignoto: scarta solo se X è molto sotto il minimo.
+    return salary.low < OPEN_SALARY_RATIO * floor if salary.open_ended else salary.high < floor
+
+
 def prefilter(job: Job, profile: dict) -> Optional[str]:
     """Filtro veloce su titolo, azienda e località, prima di scaricare la descrizione.
     Restituisce il motivo dello scarto, oppure None se l'annuncio va valutato."""
@@ -165,11 +178,8 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
         return None, "nessuna parola obbligatoria"
 
     salary = job_salary(job, "CHF" if is_swiss(job) else "EUR")
-    if salary:
-        floor = profile.get("ral_min_chf") if salary.currency == "CHF" else profile.get("ral_min_eur")
-        # Con "a partire da X" il massimo è ignoto: scarta solo se X è molto sotto il minimo.
-        if floor and (salary.low < OPEN_SALARY_RATIO * floor if salary.open_ended else salary.high < floor):
-            return None, f"RAL sotto il minimo ({salary.short()})"
+    if salary and _below_floor(salary, profile):
+        return None, f"RAL sotto il minimo ({salary.short()})"
 
     warnings: List[str] = []
 
@@ -262,4 +272,7 @@ def evaluate(job: Job, profile: dict) -> Tuple[Optional[Match], str]:
         warnings.append(f"chiede {years} anni (ne hai {yoe})")
 
     score = int(round(max(0, min(100, s_role + s_zone + s_skill + s_sen + s_lang))))
+    # Per ultimo: così si cerca la RAL altrove solo per gli annunci che meritano la notifica.
+    if not salary and profile.get("ral_required") and score >= profile.get("min_score", 60):
+        return None, RAL_MISSING
     return Match(score, role, zone or "", matched, similar, missing, warnings, salary, mode, skill_pct), ""

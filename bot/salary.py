@@ -36,7 +36,9 @@ _KEYWORD = re.compile(_KEY + r"[^\d\n]{0,60}?" + _OPTCUR + r"\s*" + _NUM + _UNIT
                       + r"(?:max\.?\s*)?(?:€|eur|euro|chf)?\s*" + _NUM + r")?" + _UNIT + _OPTCUR + _NOT_MONEY)
 
 
-_OPEN = re.compile(r"(a partire da|partire da|starting( from| at)?|from|minimum|minimo|almeno|at least|ab|des|da)\s*:?\s*$")
+_OPEN = re.compile(r"(?<![a-z])(a partire da|partire da|starting( from| at)?|from|minimum|minimo|min\.?|almeno|"
+                   r"at least|ab|des|da)\s*:?\s*$")
+_CAP = re.compile(r"(?<![a-z])(fino a|fino ad|up to|massimo|maximum|max\.?|bis zu|bis|jusqu.a)\s*:?\s*$")
 
 
 @dataclass
@@ -46,12 +48,15 @@ class Salary:
     currency: str  # "EUR" | "CHF"
     text: str
     open_ended: bool = False   # "a partire da 45.000": è il minimo della fascia, non il massimo
+    capped: bool = False       # "fino a 45.000": è il massimo, il minimo non è noto
 
     def short(self) -> str:
         sym = "€" if self.currency == "EUR" else "CHF"
         lo, hi = round(self.low / 1000), round(self.high / 1000)
         if self.open_ended and lo == hi:
             return f"da {lo}k {sym}"
+        if self.capped and lo == hi:
+            return f"fino a {hi}k {sym}"
         return f"{lo}k {sym}" if lo == hi else f"{lo}–{hi}k {sym}"
 
 
@@ -102,13 +107,15 @@ def parse_salary(text: str, default_currency: str = "EUR") -> Optional[Salary]:
                 cur = "EUR"
             else:
                 cur = default_currency
-            before = t[max(0, m.start() - 30):m.start()]
-            open_ended = len(nums) == 1 and bool(_OPEN.search(before))
-            return Salary(min(nums), max(nums), cur, m.group(0).strip(), open_ended)
+            first = next(i for i, g in enumerate(groups, 1) if g and re.match(r"\d", g))
+            before = re.sub(r"(?:€|euro?|chf|fr\.|sfr|\s|:)+$", "", t[max(0, m.start(first) - 40):m.start(first)])
+            single = len(nums) == 1
+            return Salary(min(nums), max(nums), cur, m.group(0).strip(),
+                          single and bool(_OPEN.search(before)), single and bool(_CAP.search(before)))
     return None
 
 
-def from_fields(low, high, currency: str, period: str = "year") -> Optional[Salary]:
+def from_fields(low, high, currency: str, period: str = "year", kind: str = "") -> Optional[Salary]:
     """RAL dai campi strutturati di una fonte (jobs.ch, Lever, Greenhouse).
     Solo annuale e in EUR/CHF: il resto non si confronta con le tue soglie."""
     cur = (currency or "").upper()
@@ -118,7 +125,7 @@ def from_fields(low, high, currency: str, period: str = "year") -> Optional[Sala
     if not vals or not all(15_000 <= v <= 400_000 for v in vals):
         return None
     lo, hi = min(vals), max(vals)
-    return Salary(lo, hi, cur, f"{lo:.0f}-{hi:.0f} {cur}")
+    return Salary(lo, hi, cur, f"{lo:.0f}-{hi:.0f} {cur}", kind == "open", kind == "cap")
 
 
 def job_salary(job, default_currency: str = "EUR") -> Optional[Salary]:
@@ -126,7 +133,8 @@ def job_salary(job, default_currency: str = "EUR") -> Optional[Salary]:
     riquadro retribuzione di LinkedIn, campi aggiuntivi)."""
     e = job.extra
     if e.get("sal_low") or e.get("sal_high"):
-        s = from_fields(e.get("sal_low"), e.get("sal_high"), e.get("sal_cur", ""), e.get("sal_period", "year"))
+        s = from_fields(e.get("sal_low"), e.get("sal_high"), e.get("sal_cur", ""), e.get("sal_period", "year"),
+                        e.get("sal_kind", ""))
         if s:
             return s
     return parse_salary(job.full_text, default_currency)

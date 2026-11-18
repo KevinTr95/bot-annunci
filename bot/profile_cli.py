@@ -81,7 +81,7 @@ def _validate(p: dict) -> list:
         errors.append("«min_skill_match» deve essere un intero fra 0 e 100")
     if not set(p.get("work_modes") or []) <= {"remote", "hybrid", "onsite"}:
         errors.append("«work_modes» ammette solo \"remote\", \"hybrid\", \"onsite\" (lista vuota = tutte)")
-    for key in ("work_mode_strict", "languages_strict"):
+    for key in ("work_mode_strict", "languages_strict", "ral_required", "ral_floor_on_low"):
         if not isinstance(p.get(key, False), bool):
             errors.append(f"«{key}» deve essere true o false")
     for key, o in (p.get("overrides") or {}).items():

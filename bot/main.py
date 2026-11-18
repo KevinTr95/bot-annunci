@@ -21,15 +21,17 @@ from zoneinfo import ZoneInfo
 from . import config, http
 from .commands import handle_updates
 from .health import recovery_message
-from .matcher import Match, evaluate, prefilter
+from .matcher import RAL_MISSING, Match, evaluate, prefilter
 from .models import Job, parse_dt
 from .notify import job_message
+from .salary_lookup import find_on_company_site
 from .sources import ats, build_tasks, fetch_detail
 from .storage import effective_profile, load_profile, load_state, save_profile, save_state
 from .telegram import Telegram
 from .zones import linkedin_locations
 
 MAX_DETAIL_TRIES = 24  # ~2 ore di giri ogni 5 minuti
+SALARY_LOOKUP_SECONDS = 25   # tempo massimo per giro per cercare la RAL sui siti carriere
 ALERT_AFTER_FAILS = 6   # ~2 ore di errori di fila prima di avvisarti
 
 
@@ -275,15 +277,44 @@ def run(dry_run: bool = False) -> None:
         _log(f"{len(new_deferred)} annunci rimandati al prossimo giro")
 
     matches: List[Tuple[Job, Match]] = []
-    for job in ready:
-        m, reason = evaluate(job, profile)
+
+    def judge(job: Job, m, reason: str) -> None:
         if m and m.score >= profile.get("min_score", 60):
             matches.append((job, m))
-        else:
-            seen[job.uid] = int(now)
+            return
+        seen[job.uid] = int(now)
+        # Senza RAL qui, lo stesso annuncio può averla su un'altra fonte: quella resta valutabile.
+        if reason != RAL_MISSING:
             fps[job.fingerprint] = int(now)
-            if config.VERBOSE:
-                _log(f"scartato ({reason or f'punteggio {m.score}'}): {job.title} – {job.company}")
+        if config.VERBOSE:
+            _log(f"scartato ({reason or f'punteggio {m.score}'}): {job.title} – {job.company}")
+
+    no_salary: List[Job] = []
+    for job in ready:
+        m, reason = evaluate(job, profile)
+        if reason == RAL_MISSING:
+            no_salary.append(job)
+        else:
+            judge(job, m, reason)
+
+    # RAL obbligatoria: prima di rinunciare la si cerca sul sito carriere dell'azienda.
+    lookup = state.setdefault("ats_lookup", {})
+    lookup_end = time.time() + SALARY_LOOKUP_SECONDS
+    for job in no_salary:
+        try:
+            if time.time() > lookup_end:
+                raise TimeoutError
+            found = find_on_company_site(job, lookup, lookup_end)
+        except TimeoutError:
+            n = _tries(deferred.get(job.uid)) + 1
+            if n < MAX_DETAIL_TRIES:
+                state["deferred"][job.uid] = {"n": n, "job": _job_to_dict(job)}
+                continue
+            found = False
+        except Exception as e:
+            _log(f"ricerca RAL sul sito carriere: {type(e).__name__}")
+            found = False
+        judge(job, *(evaluate(job, profile) if found else (None, RAL_MISSING)))
     matches.sort(key=lambda jm: -jm[1].score)
     # Stesso annuncio da due fonti (o ripubblicato due volte) nello stesso giro: ne teniamo uno.
     unique: Dict[str, Tuple[Job, Match]] = {}
